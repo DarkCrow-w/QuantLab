@@ -1,0 +1,29 @@
+strategy:
+  name: ma_cross
+  params:
+    fast_period: 5
+    slow_period: 20
+
+data:
+  source: akshare
+  symbols:
+    - "600519"
+  start_date: "2024-06-01"
+  end_date: "2026-12-31"
+  use_cache: false
+
+risk:
+  max_position_pct: 0.3
+  max_drawdown: 0.2
+
+broker:
+  type: futu
+  host: "127.0.0.1"
+  port: 11111
+
+engine:
+  initial_cash: 1000000
+
+schedule:
+  hour: 15
+  minute: 5
