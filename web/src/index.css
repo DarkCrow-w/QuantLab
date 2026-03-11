@@ -1,0 +1,204 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg-base: #0b0e11;
+  --bg-card: #141619;
+  --bg-elevated: #1a1d21;
+  --bg-input: #1e2126;
+  --border: #2b2f36;
+  --border-light: #1e2126;
+  --text-primary: #eaecef;
+  --text-secondary: #848e9c;
+  --text-third: #5e6673;
+  --accent: #1890ff;
+  --accent-hover: #40a9ff;
+  --up: #0ecb81;
+  --up-bg: rgba(14, 203, 129, 0.08);
+  --down: #f6465d;
+  --down-bg: rgba(246, 70, 93, 0.08);
+  --profit: #0ecb81;
+  --loss: #f6465d;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-third);
+}
+
+/* Ant overrides for deep dark theme */
+.ant-table {
+  background: var(--bg-card) !important;
+  font-size: 12px !important;
+}
+.ant-table-thead > tr > th,
+.ant-table-thead > tr > td {
+  background: var(--bg-elevated) !important;
+  color: var(--text-secondary) !important;
+  border-bottom: 1px solid var(--border) !important;
+  font-weight: 500 !important;
+  font-size: 12px !important;
+  padding: 8px 12px !important;
+}
+.ant-table-tbody > tr > td {
+  border-bottom: 1px solid var(--border-light) !important;
+  padding: 6px 12px !important;
+  color: var(--text-primary) !important;
+}
+.ant-table-tbody > tr:hover > td {
+  background: var(--bg-elevated) !important;
+}
+
+.ant-tabs-card > .ant-tabs-nav .ant-tabs-tab {
+  background: var(--bg-elevated) !important;
+  border-color: var(--border) !important;
+  color: var(--text-secondary) !important;
+  font-size: 13px !important;
+  padding: 6px 16px !important;
+  margin-right: 2px !important;
+  border-radius: 6px 6px 0 0 !important;
+}
+.ant-tabs-card > .ant-tabs-nav .ant-tabs-tab-active {
+  background: var(--bg-card) !important;
+  border-bottom-color: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+}
+
+.ant-select-selector,
+.ant-input-number,
+.ant-picker {
+  background: var(--bg-input) !important;
+  border-color: var(--border) !important;
+}
+
+.ant-select-selector:hover,
+.ant-input-number:hover,
+.ant-picker:hover {
+  border-color: var(--accent) !important;
+}
+
+.ant-pagination .ant-pagination-item {
+  background: var(--bg-elevated) !important;
+  border-color: var(--border) !important;
+}
+.ant-pagination .ant-pagination-item-active {
+  border-color: var(--accent) !important;
+}
+
+/* Custom utility classes */
+.mono {
+  font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+}
+
+/* ── Agent chat markdown ── */
+.agent-markdown p {
+  margin: 0 0 8px 0;
+}
+.agent-markdown p:last-child {
+  margin-bottom: 0;
+}
+.agent-markdown h1, .agent-markdown h2, .agent-markdown h3 {
+  color: var(--text-primary);
+  margin: 12px 0 6px 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.agent-markdown ul, .agent-markdown ol {
+  margin: 4px 0;
+  padding-left: 20px;
+}
+.agent-markdown li {
+  margin: 2px 0;
+}
+.agent-markdown code {
+  background: var(--bg-base);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: #e6a07c;
+}
+.agent-markdown pre {
+  background: var(--bg-base);
+  padding: 10px 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 6px 0;
+}
+.agent-markdown pre code {
+  padding: 0;
+  background: transparent;
+  color: var(--text-primary);
+}
+.agent-markdown table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 6px 0;
+  font-size: 12px;
+}
+.agent-markdown th, .agent-markdown td {
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  text-align: left;
+}
+.agent-markdown th {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.agent-markdown blockquote {
+  border-left: 3px solid var(--accent);
+  padding-left: 10px;
+  color: var(--text-secondary);
+  margin: 6px 0;
+}
+.agent-markdown a {
+  color: var(--accent);
+}
+.agent-markdown strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Streaming cursor blink */
+.streaming-cursor::after {
+  content: '▊';
+  animation: blink 1s infinite;
+  color: var(--accent);
+  font-size: 14px;
+  margin-left: 2px;
+}
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
