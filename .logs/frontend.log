@@ -1,0 +1,16 @@
+
+> web@0.0.0 dev /root/quant/web
+> vite --host 0.0.0.0
+
+
+  VITE v8.0.8  ready in 207 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.255.255.254:5173/
+  ➜  Network: http://192.168.0.101:5173/
+8:26:20 PM [vite] http proxy error: /api/strategy/list
+Error: connect ECONNREFUSED 127.0.0.1:8000
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)
+8:26:20 PM [vite] http proxy error: /api/strategy/list
+Error: connect ECONNREFUSED 127.0.0.1:8000
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)
