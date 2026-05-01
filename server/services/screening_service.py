@@ -9,7 +9,7 @@ import pandas as pd
 from quant.core.bar import Bar
 from quant.core.events import SignalEvent
 from quant.core.events import OrderSide
-from quant.data.cache import CACHE_DIR, load_cache
+from quant.data import get_store
 from quant.strategy.base import Context
 
 from server.models.screening import ScreenMatch, ScreenRequest, ScreenResult
@@ -48,13 +48,11 @@ def _process_symbol(
     lookback: int,
 ) -> ScreenMatch | None:
     """加载缓存并筛选单只股票。"""
-    df = load_cache(symbol)
+    df = get_store().get_kline(symbol, freq="day", end=scan_dt)
     if df is None or df.empty:
         return None
 
-    # 过滤到 scan_date
-    df = df[df["dt"] <= scan_dt].sort_values("dt")
-    df = df.tail(lookback)
+    df = df.sort_values("dt").tail(lookback)
 
     if len(df) < 30:
         return None
@@ -99,7 +97,7 @@ def run_screening(req: ScreenRequest) -> ScreenResult:
     scan_dt = date.fromisoformat(req.scan_date) if req.scan_date else date.today()
     params = req.strategy_params or {}
 
-    symbols = sorted(p.stem for p in CACHE_DIR.glob("*.parquet"))
+    symbols = get_store().list_symbols("day")
 
     matches: list[ScreenMatch] = []
 
