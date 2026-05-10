@@ -98,7 +98,16 @@
       "Bash(./.venv/bin/python *)",
       "Bash(awk '{print $1}')",
       "Bash(xargs -r kill)",
-      "Bash(xargs -I{} basename {} .parquet)"
+      "Bash(xargs -I{} basename {} .parquet)",
+      "Bash(tee /tmp/dip_smoke.log)",
+      "Bash(ps -p 4637 -o etime,pcpu,rss,stat)",
+      "Bash(kill 4637)",
+      "Bash(ps -p 5324 -o etime,pcpu,rss)",
+      "Bash(kill 5324)",
+      "Bash(pkill -f dip_buy_smoke)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5173/)",
+      "Bash(curl -s http://localhost:5173/src/pages/BacktestPage.tsx)"
     ]
   }
 }

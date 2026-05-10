@@ -16,9 +16,12 @@
 """
 from __future__ import annotations
 
+import pandas as pd
+
 from quant.core.bar import Bar
 from quant.core.events import SignalEvent
 from quant.core.order import OrderSide
+from quant.data.indicators import compute
 from quant.strategy.base import Context, Strategy
 
 
@@ -43,14 +46,11 @@ def _calc_kdj(bars: list[Bar], period: int = 9) -> tuple[float, float, float]:
 
 
 def _calc_bbi(closes: list[float]) -> float | None:
-    """BBI = (MA3 + MA6 + MA12 + MA24) / 4"""
+    """BBI = (MA3+MA6+MA12+MA24)/4 — 调用 ``quant.data.indicators.BBI``。"""
     if len(closes) < 24:
         return None
-    periods = [3, 6, 12, 24]
-    total = 0.0
-    for p in periods:
-        total += sum(closes[-p:]) / p
-    return total / 4.0
+    df = pd.DataFrame({"close": closes})
+    return float(compute("BBI", df)["bbi"].iat[-1])
 
 
 def _calc_atr(bars: list[Bar], period: int = 14) -> float:

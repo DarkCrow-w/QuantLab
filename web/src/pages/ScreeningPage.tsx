@@ -1,7 +1,12 @@
+import { useState } from 'react';
 import { Alert, Spin, Table, Tag } from 'antd';
 import { FundOutlined, SearchOutlined } from '@ant-design/icons';
 import { useScreeningStore } from '../stores/screening';
-import KlineChart from '../components/chart/KlineChart';
+import KlineChart, { type SubplotKey } from '../components/chart/KlineChart';
+import OverlaySelector, {
+  SubplotSelector,
+  keysToOverlays,
+} from '../components/chart/OverlaySelector';
 
 function EmptyState() {
   return (
@@ -71,8 +76,10 @@ function formatAmount(v: number): string {
 }
 
 export default function ScreeningPage() {
-  const { result, loading, error, selectedSymbol, klineData, klineLoading, selectSymbol, strategyParams } =
+  const { result, loading, error, selectedSymbol, klineData, klineLoading, selectSymbol } =
     useScreeningStore();
+  const [overlayKeys, setOverlayKeys] = useState<string[]>(['MA5', 'MA20', 'BBI']);
+  const [subplots, setSubplots] = useState<SubplotKey[]>(['VOL', 'MACD']);
 
   if (loading) {
     return (
@@ -238,15 +245,23 @@ export default function ScreeningPage() {
               borderBottom: '1px solid #1e2126',
               display: 'flex',
               alignItems: 'center',
-              gap: 8,
+              justifyContent: 'space-between',
+              gap: 16,
               color: '#848e9c',
               fontSize: 12,
             }}
           >
-            <span className="mono" style={{ color: '#1890ff', fontWeight: 500 }}>
-              {selectedSymbol}
-            </span>
-            <span>K线走势</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="mono" style={{ color: '#1890ff', fontWeight: 500 }}>
+                {selectedSymbol}
+              </span>
+              <span>K线走势</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <OverlaySelector value={overlayKeys} onChange={setOverlayKeys} />
+              <span style={{ color: '#2b2f36' }}>|</span>
+              <SubplotSelector value={subplots} onChange={setSubplots} />
+            </div>
           </div>
           {klineLoading ? (
             <div style={{ padding: 40, textAlign: 'center' }}>
@@ -258,8 +273,8 @@ export default function ScreeningPage() {
                 kline={klineData}
                 trades={[]}
                 symbol={selectedSymbol}
-                fastPeriod={strategyParams.fast_period ?? strategyParams.ma_period ?? 5}
-                slowPeriod={strategyParams.slow_period ?? 20}
+                overlays={keysToOverlays(overlayKeys)}
+                subplots={subplots}
               />
             </div>
           ) : (

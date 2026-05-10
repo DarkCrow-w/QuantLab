@@ -8,7 +8,11 @@ import {
 import { useBacktestStore } from '../stores/backtest';
 import MetricsCards from '../components/backtest/MetricsCards';
 import TradesTable from '../components/backtest/TradesTable';
-import KlineChart from '../components/chart/KlineChart';
+import KlineChart, { type SubplotKey } from '../components/chart/KlineChart';
+import OverlaySelector, {
+  SubplotSelector,
+  keysToOverlays,
+} from '../components/chart/OverlaySelector';
 import EquityChart from '../components/chart/EquityChart';
 import Loading from '../components/common/Loading';
 
@@ -88,8 +92,10 @@ function PanelHeader({ title, icon }: { title: string; icon: React.ReactNode }) 
 }
 
 export default function BacktestPage() {
-  const { result, loading, error, strategyParams } = useBacktestStore();
+  const { result, loading, error } = useBacktestStore();
   const [activeSymbol, setActiveSymbol] = useState<string>('');
+  const [overlayKeys, setOverlayKeys] = useState<string[]>(['MA5', 'MA20', 'BBI']);
+  const [subplots, setSubplots] = useState<SubplotKey[]>(['VOL', 'MACD']);
 
   if (loading) return <Loading />;
   if (error)
@@ -116,7 +122,15 @@ export default function BacktestPage() {
       {/* K-line Chart */}
       {symbols.length > 0 && (
         <PanelCard>
-          <div style={{ padding: '6px 14px 0' }}>
+          <div
+            style={{
+              padding: '6px 14px 0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 16,
+            }}
+          >
             <Tabs
               activeKey={currentSymbol}
               onChange={setActiveSymbol}
@@ -129,16 +143,21 @@ export default function BacktestPage() {
                   </span>
                 ),
               }))}
-              style={{ marginBottom: 0 }}
+              style={{ marginBottom: 0, flex: 1 }}
             />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <OverlaySelector value={overlayKeys} onChange={setOverlayKeys} />
+              <span style={{ color: '#2b2f36' }}>|</span>
+              <SubplotSelector value={subplots} onChange={setSubplots} />
+            </div>
           </div>
           <div style={{ padding: '0 6px' }}>
             <KlineChart
               kline={result.kline_data[currentSymbol]}
               trades={result.trades}
               symbol={currentSymbol}
-              fastPeriod={strategyParams.fast_period ?? strategyParams.ma_period ?? 5}
-              slowPeriod={strategyParams.slow_period ?? 20}
+              overlays={keysToOverlays(overlayKeys)}
+              subplots={subplots}
             />
           </div>
         </PanelCard>

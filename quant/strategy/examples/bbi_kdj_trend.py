@@ -13,17 +13,27 @@ BBI趋势 + KDJ择时 策略
   - BBI跌破: 连续N天收盘价 < BBI → 清仓
   - 追踪止盈: 从持仓最高点回落 > ATR × atr_trail_mult → 清仓
   - 硬止损: 亏损超过 stop_loss_pct → 清仓
+
+指标说明: KDJ/ATR 因参数 (period) 可变，保留内联实现；
+BBI 公式固定 (3,6,12,24)，复用 ``quant.data.indicators.BBI`` 的官方实现。
 """
 from __future__ import annotations
+
+import pandas as pd
 
 from quant.core.bar import Bar
 from quant.core.events import SignalEvent
 from quant.core.order import OrderSide
+from quant.data.indicators import compute
 from quant.strategy.base import Context, Strategy
 
 
 def _calc_kdj_series(bars: list[Bar], period: int = 9) -> list[tuple[float, float, float]]:
-    """返回每根bar的 (K, D, J)，前 period-1 根返回 (50,50,50)。"""
+    """返回每根bar的 (K, D, J)，前 period-1 根返回 (50,50,50)。
+
+    与 ``quant.data.indicators.KDJ`` 公式完全一致；此处保留是为了支持
+    ``period != 9`` 的策略参数化。
+    """
     results: list[tuple[float, float, float]] = []
     k, d = 50.0, 50.0
     for i in range(len(bars)):
@@ -41,18 +51,21 @@ def _calc_kdj_series(bars: list[Bar], period: int = 9) -> list[tuple[float, floa
     return results
 
 
+def _calc_bbi_series(bars: list[Bar]) -> pd.Series:
+    """BBI = (MA3+MA6+MA12+MA24)/4 — 调用 ``quant.data.indicators.BBI``。"""
+    df = pd.DataFrame({"close": [b.close for b in bars]})
+    return compute("BBI", df)["bbi"]
+
+
 def _calc_bbi(closes: list[float], idx: int) -> float | None:
-    """计算第 idx 根的 BBI = (MA3+MA6+MA12+MA24)/4"""
-    if idx < 23:
+    if idx < 23 or idx >= len(closes):
         return None
-    total = 0.0
-    for p in (3, 6, 12, 24):
-        total += sum(closes[idx - p + 1: idx + 1]) / p
-    return total / 4.0
+    df = pd.DataFrame({"close": closes[: idx + 1]})
+    return float(compute("BBI", df)["bbi"].iat[-1])
 
 
 def _calc_atr(bars: list[Bar], end: int, period: int = 14) -> float:
-    """计算截至 end 位置的 ATR。"""
+    """计算截至 end 位置的 ATR。参数化 period，故保留内联。"""
     start = max(1, end - period + 1)
     trs = []
     for i in range(start, end + 1):

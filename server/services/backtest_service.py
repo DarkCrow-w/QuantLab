@@ -11,6 +11,7 @@ from quant.data.tushare_feed import TuShareFeed
 from quant.engine.backtest import BacktestEngine
 from quant.execution.simulated import SimulatedBroker
 from quant.risk.basic import BasicRiskManager
+from quant.strategy.examples.dip_buy import DipBuyStrategy
 from quant.strategy.examples.ma_cross import MACrossStrategy
 from quant.strategy.examples.vol_kdj_bbi import VolKDJBBIStrategy
 from quant.strategy.examples.bbi_kdj_trend import BBIKDJTrendStrategy
@@ -59,6 +60,22 @@ STRATEGY_REGISTRY: dict[str, dict] = {
             ParamSchema(name="vol_ratio", type="float", default=1.0, min=0.8, max=2.0, label="放量倍数"),
             ParamSchema(name="atr_trail_mult", type="float", default=2.5, min=1.5, max=4.0, label="追踪止盈ATR倍"),
             ParamSchema(name="stop_loss_pct", type="float", default=0.05, min=0.02, max=0.15, label="硬止损%"),
+        ],
+    },
+    "dip_buy": {
+        "cls": DipBuyStrategy,
+        "display_name": "抄底（RSI+KDJ+VOL+BBI）",
+        "params_schema": [
+            ParamSchema(name="ma_period", type="int", default=20, min=10, max=60, label="均线/N型周期"),
+            ParamSchema(name="vol_lookback", type="int", default=20, min=10, max=40, label="量能观察期"),
+            ParamSchema(name="volume_climax_ratio", type="float", default=2.0, min=1.5, max=6.0, label="天量倍数"),
+            ParamSchema(name="kdj_j_threshold", type="int", default=10, min=0, max=30, label="KDJ-J阈值"),
+            ParamSchema(name="rsi3_threshold", type="int", default=20, min=10, max=40, label="RSI(3)阈值"),
+            ParamSchema(name="bbi_band_pct", type="float", default=0.05, min=0.02, max=0.10, label="BBI带宽±%"),
+            ParamSchema(name="doji_shrink_ratio", type="float", default=0.85, min=0.50, max=1.00, label="缩量倍率"),
+            ParamSchema(name="stop_loss_pct", type="float", default=0.04, min=0.02, max=0.08, label="止损%"),
+            ParamSchema(name="bbi_confirm_days", type="int", default=2, min=1, max=5, label="BBI确认天数"),
+            ParamSchema(name="n_form_close_pct", type="float", default=0.05, min=0.02, max=0.10, label="N型前低接近度"),
         ],
     },
 }
@@ -212,22 +229,23 @@ def run_backtest(req: BacktestRequest) -> BacktestResult:
                 commission=round(float(row["commission"]), 2),
             ))
 
-    # Build kline data from feed
+    # Build kline data from feed (uses DataFeed.get_dataframe — no private reach-in)
     kline_data: dict[str, list[KlineBar]] = {}
     for sym in req.symbols:
-        if sym in feed._data:
-            df = feed._data[sym]
-            bars = []
-            for _, r in df.iterrows():
-                bars.append(KlineBar(
-                    dt=str(r["dt"]),
-                    open=round(float(r["open"]), 4),
-                    high=round(float(r["high"]), 4),
-                    low=round(float(r["low"]), 4),
-                    close=round(float(r["close"]), 4),
-                    volume=float(r["volume"]),
-                ))
-            kline_data[sym] = bars
+        df = feed.get_dataframe(sym)
+        if df.empty:
+            continue
+        bars = []
+        for r in df.itertuples(index=False):
+            bars.append(KlineBar(
+                dt=str(r.dt),
+                open=round(float(r.open), 4),
+                high=round(float(r.high), 4),
+                low=round(float(r.low), 4),
+                close=round(float(r.close), 4),
+                volume=float(r.volume),
+            ))
+        kline_data[sym] = bars
 
     metrics = _compute_enhanced_metrics(
         trades_df, equity_curve, req.initial_cash, engine.portfolio.total_commission
