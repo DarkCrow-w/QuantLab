@@ -1,9 +1,15 @@
-data/
-results/
+/data/
+/results/
+.venv/
+.claude/
 __pycache__/
 *.pyc
+.logs/
+.pids/
 .env
+config/quant.env
 *.egg-info/
 dist/
 build/
 .pytest_cache/
+web/node_modules/
