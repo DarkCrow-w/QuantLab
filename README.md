@@ -12,6 +12,23 @@
 
 另外还有一个 `app.py`，它是一个独立的 Streamlit 回测可视化入口，适合本地快速验证策略。
 
+## 统一配置
+
+项目运行配置统一放在 `config/quant.env`。该文件包含数据源 Token、AI
+模型、端口、并发、内存限制和 Futu OpenD 等设置，并已被
+Git 忽略。
+
+首次部署可从模板创建：
+
+```bash
+cp config/quant.env.example config/quant.env
+```
+
+修改配置后执行 `./quant.sh restart` 生效。系统环境变量的优先级高于配置
+文件；也可以通过 `QUANT_CONFIG_FILE=/path/to/quant.env` 使用其他配置文件。
+策略参数仍保留在 `configs/*.yaml`，它们属于每次回测或实盘任务的业务参数，
+不包含 Token。
+
 ## 2. 整体结构
 
 ```text
