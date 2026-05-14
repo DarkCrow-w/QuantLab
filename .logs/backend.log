@@ -145,3 +145,226 @@ INFO:     127.0.0.1:41339 - "POST /api/backtest/run HTTP/1.1" 200 OK
 2026-05-10 19:23:56.893 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 002657 qty=10400 price=27.36 comm=71.14
 2026-05-10 19:23:56.904 | INFO     | quant.engine.backtest:run:94 - Backtest finished: 752 bars, 9 trades
 INFO:     127.0.0.1:43637 - "POST /api/backtest/run HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44129 - "GET /api/strategy/list HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44135 - "GET /api/strategy/list HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40791 - "POST /api/screening/scan HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41509 - "GET /api/market/kline?symbol=000683&start_date=2025-11-10&end_date=2026-05-10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42717 - "GET /api/market/kline?symbol=000715&start_date=2025-11-10&end_date=2026-05-10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42693 - "GET /api/market/kline?symbol=002168&start_date=2025-11-10&end_date=2026-05-10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44589 - "GET /api/market/kline?symbol=002168&start_date=2025-11-10&end_date=2026-05-10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44595 - "GET /api/market/kline?symbol=002588&start_date=2025-11-10&end_date=2026-05-10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41659 - "GET /api/strategy/list HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41667 - "GET /api/strategy/list HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40965 - "GET /api/strategy/list HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40977 - "GET /api/strategy/list HTTP/1.1" 200 OK
+2026-05-10 22:29:10.792 | DEBUG    | quant.data.cache:load_cache:36 - Loading cache for 600519
+2026-05-10 22:29:10.793 | INFO     | quant.data.tushare_feed:subscribe:105 - Subscribed 600519: 402 bars
+2026-05-10 22:29:10.794 | INFO     | quant.engine.backtest:run:39 - Backtest started
+2026-05-10 22:29:10.799 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1730.34 comm=43.26
+2026-05-10 22:29:10.801 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1701.00 comm=42.52
+2026-05-10 22:29:10.802 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1733.58 comm=43.34
+2026-05-10 22:29:10.806 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1806.08 comm=45.15
+2026-05-10 22:29:10.807 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1852.83 comm=46.32
+2026-05-10 22:29:10.809 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1822.53 comm=45.56
+2026-05-10 22:29:10.815 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1780.00 comm=44.50
+2026-05-10 22:29:10.818 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1768.00 comm=44.20
+2026-05-10 22:29:10.821 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1715.00 comm=42.88
+2026-05-10 22:29:10.822 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1641.01 comm=41.03
+2026-05-10 22:29:10.825 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1720.01 comm=43.00
+2026-05-10 22:29:10.828 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1675.00 comm=41.88
+2026-05-10 22:29:10.829 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1719.00 comm=42.98
+2026-05-10 22:29:10.831 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1701.64 comm=42.54
+2026-05-10 22:29:10.831 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1722.00 comm=43.05
+2026-05-10 22:29:10.832 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1660.67 comm=41.52
+2026-05-10 22:29:10.834 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1694.00 comm=42.35
+2026-05-10 22:29:10.836 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1717.99 comm=42.95
+2026-05-10 22:29:10.842 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1499.50 comm=37.49
+2026-05-10 22:29:10.844 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1415.00 comm=35.38
+2026-05-10 22:29:10.846 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=200 price=1426.79 comm=71.34
+2026-05-10 22:29:10.847 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=200 price=1404.07 comm=70.20
+2026-05-10 22:29:10.851 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1692.00 comm=42.30
+2026-05-10 22:29:10.853 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1560.00 comm=39.00
+2026-05-10 22:29:10.855 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1660.89 comm=41.52
+2026-05-10 22:29:10.856 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1543.00 comm=38.58
+2026-05-10 22:29:10.859 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1550.01 comm=38.75
+2026-05-10 22:29:10.861 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1528.90 comm=38.22
+2026-05-10 22:29:10.862 | INFO     | quant.engine.backtest:run:94 - Backtest finished: 402 bars, 28 trades
+INFO:     127.0.0.1:41631 - "POST /api/backtest/run HTTP/1.1" 200 OK
+2026-05-10 22:44:35.566 | DEBUG    | quant.data.cache:load_cache:36 - Loading cache for 600519
+2026-05-10 22:44:35.566 | INFO     | quant.data.tushare_feed:subscribe:105 - Subscribed 600519: 725 bars
+2026-05-10 22:44:35.567 | INFO     | quant.engine.backtest:run:39 - Backtest started
+2026-05-10 22:44:35.571 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1730.34 comm=43.26
+2026-05-10 22:44:35.573 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1701.00 comm=42.52
+2026-05-10 22:44:35.574 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1733.58 comm=43.34
+2026-05-10 22:44:35.579 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1806.08 comm=45.15
+2026-05-10 22:44:35.581 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1852.83 comm=46.32
+2026-05-10 22:44:35.582 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1822.53 comm=45.56
+2026-05-10 22:44:35.587 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1780.00 comm=44.50
+2026-05-10 22:44:35.591 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1768.00 comm=44.20
+2026-05-10 22:44:35.596 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1715.00 comm=42.88
+2026-05-10 22:44:35.597 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1641.01 comm=41.03
+2026-05-10 22:44:35.601 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1720.01 comm=43.00
+2026-05-10 22:44:35.604 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1675.00 comm=41.88
+2026-05-10 22:44:35.604 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1719.00 comm=42.98
+2026-05-10 22:44:35.606 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1701.64 comm=42.54
+2026-05-10 22:44:35.607 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1722.00 comm=43.05
+2026-05-10 22:44:35.608 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1660.67 comm=41.52
+2026-05-10 22:44:35.610 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1694.00 comm=42.35
+2026-05-10 22:44:35.613 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1717.99 comm=42.95
+2026-05-10 22:44:35.619 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1499.50 comm=37.49
+2026-05-10 22:44:35.621 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1415.00 comm=35.38
+2026-05-10 22:44:35.624 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=200 price=1426.79 comm=71.34
+2026-05-10 22:44:35.625 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=200 price=1404.07 comm=70.20
+2026-05-10 22:44:35.629 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1692.00 comm=42.30
+2026-05-10 22:44:35.631 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1560.00 comm=39.00
+2026-05-10 22:44:35.633 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1660.89 comm=41.52
+2026-05-10 22:44:35.634 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1543.00 comm=38.58
+2026-05-10 22:44:35.637 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1550.01 comm=38.75
+2026-05-10 22:44:35.639 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1528.90 comm=38.22
+2026-05-10 22:44:35.645 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1481.00 comm=37.02
+2026-05-10 22:44:35.650 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1530.00 comm=38.25
+2026-05-10 22:44:35.653 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1550.00 comm=38.75
+2026-05-10 22:44:35.653 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1557.10 comm=38.93
+2026-05-10 22:44:35.655 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1578.99 comm=39.47
+2026-05-10 22:44:35.657 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1551.00 comm=38.77
+2026-05-10 22:44:35.663 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1420.98 comm=35.52
+2026-05-10 22:44:35.664 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1420.00 comm=35.50
+2026-05-10 22:44:35.664 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1436.99 comm=35.92
+2026-05-10 22:44:35.666 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1415.00 comm=35.38
+2026-05-10 22:44:35.669 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1448.88 comm=36.22
+2026-05-10 22:44:35.673 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1450.50 comm=36.26
+2026-05-10 22:44:35.675 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1459.00 comm=36.48
+2026-05-10 22:44:35.677 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1421.81 comm=35.55
+2026-05-10 22:44:35.678 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1462.12 comm=36.55
+2026-05-10 22:44:35.680 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1446.50 comm=36.16
+2026-05-10 22:44:35.686 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1417.00 comm=35.43
+2026-05-10 22:44:35.687 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1395.00 comm=34.88
+2026-05-10 22:44:35.689 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1485.00 comm=37.12
+2026-05-10 22:44:35.692 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1415.00 comm=35.38
+2026-05-10 22:44:35.694 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1472.96 comm=36.82
+2026-05-10 22:44:35.695 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1409.00 comm=35.23
+2026-05-10 22:44:35.696 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1459.44 comm=36.49
+2026-05-10 22:44:35.699 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1415.00 comm=35.38
+2026-05-10 22:44:35.701 | INFO     | quant.engine.backtest:run:94 - Backtest finished: 725 bars, 52 trades
+INFO:     127.0.0.1:41797 - "POST /api/backtest/run HTTP/1.1" 200 OK
+2026-05-10 22:44:53.529 | DEBUG    | quant.data.cache:load_cache:36 - Loading cache for 600519
+2026-05-10 22:44:53.530 | INFO     | quant.data.tushare_feed:subscribe:105 - Subscribed 600519: 725 bars
+2026-05-10 22:44:53.530 | INFO     | quant.engine.backtest:run:39 - Backtest started
+2026-05-10 22:44:53.551 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1807.58 comm=45.19
+2026-05-10 22:44:53.582 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1630.00 comm=40.75
+2026-05-10 22:44:53.615 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1702.58 comm=42.56
+2026-05-10 22:44:53.630 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1602.99 comm=40.07
+2026-05-10 22:44:53.654 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1565.00 comm=39.12
+2026-05-10 22:44:53.659 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1511.00 comm=37.77
+2026-05-10 22:44:53.686 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1564.00 comm=39.10
+2026-05-10 22:44:53.731 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1444.41 comm=36.11
+2026-05-10 22:44:53.770 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=100 price=1486.60 comm=37.16
+2026-05-10 22:44:53.776 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 600519 qty=100 price=1406.00 comm=35.15
+2026-05-10 22:44:53.779 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 600519 qty=200 price=1395.00 comm=69.75
+2026-05-10 22:44:53.821 | INFO     | quant.engine.backtest:run:94 - Backtest finished: 725 bars, 11 trades
+INFO:     127.0.0.1:42171 - "POST /api/backtest/run HTTP/1.1" 200 OK
+2026-05-10 22:46:00.112 | DEBUG    | quant.data.cache:load_cache:36 - Loading cache for 000400
+2026-05-10 22:46:00.113 | INFO     | quant.data.tushare_feed:subscribe:105 - Subscribed 000400: 748 bars
+2026-05-10 22:46:00.113 | INFO     | quant.engine.backtest:run:39 - Backtest started
+2026-05-10 22:46:00.124 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 000400 qty=13700 price=21.68 comm=74.25
+2026-05-10 22:46:00.174 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 000400 qty=13700 price=18.78 comm=64.31
+2026-05-10 22:46:00.223 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 000400 qty=12300 price=23.24 comm=71.46
+2026-05-10 22:46:00.248 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 000400 qty=6100 price=27.33 comm=41.67
+2026-05-10 22:46:00.253 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 000400 qty=6200 price=26.64 comm=41.29
+2026-05-10 22:46:00.322 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 000400 qty=14000 price=21.54 comm=75.38
+2026-05-10 22:46:00.325 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 000400 qty=7000 price=24.50 comm=42.88
+2026-05-10 22:46:00.331 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 000400 qty=7000 price=22.47 comm=39.32
+2026-05-10 22:46:00.333 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 000400 qty=13800 price=22.30 comm=76.94
+2026-05-10 22:46:00.358 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 000400 qty=6900 price=23.61 comm=40.73
+2026-05-10 22:46:00.383 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 000400 qty=6900 price=25.06 comm=43.23
+2026-05-10 22:46:00.392 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 000400 qty=11700 price=27.22 comm=79.62
+2026-05-10 22:46:00.397 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 000400 qty=11700 price=25.61 comm=74.91
+2026-05-10 22:46:00.413 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 000400 qty=10200 price=30.26 comm=77.16
+2026-05-10 22:46:00.432 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 000400 qty=5100 price=33.29 comm=42.44
+2026-05-10 22:46:00.438 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 000400 qty=5100 price=31.43 comm=40.07
+2026-05-10 22:46:00.445 | INFO     | quant.engine.backtest:run:94 - Backtest finished: 748 bars, 16 trades
+INFO:     127.0.0.1:43481 - "POST /api/backtest/run HTTP/1.1" 200 OK
+2026-05-10 22:46:24.622 | DEBUG    | quant.data.cache:load_cache:36 - Loading cache for 000400
+2026-05-10 22:46:24.623 | INFO     | quant.data.tushare_feed:subscribe:105 - Subscribed 000400: 468 bars
+2026-05-10 22:46:24.623 | INFO     | quant.engine.backtest:run:39 - Backtest started
+2026-05-10 22:46:24.690 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 000400 qty=13900 price=21.54 comm=74.84
+2026-05-10 22:46:24.692 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 000400 qty=6900 price=24.50 comm=42.26
+2026-05-10 22:46:24.698 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 000400 qty=7000 price=22.47 comm=39.32
+2026-05-10 22:46:24.700 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 000400 qty=13700 price=22.30 comm=76.38
+2026-05-10 22:46:24.721 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 000400 qty=6800 price=23.61 comm=40.13
+2026-05-10 22:46:24.741 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 000400 qty=6900 price=25.06 comm=43.23
+2026-05-10 22:46:24.749 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 000400 qty=11700 price=27.22 comm=79.62
+2026-05-10 22:46:24.753 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 000400 qty=11700 price=25.61 comm=74.91
+2026-05-10 22:46:24.769 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 000400 qty=10200 price=30.26 comm=77.16
+2026-05-10 22:46:24.787 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 000400 qty=5100 price=33.29 comm=42.44
+2026-05-10 22:46:24.792 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 000400 qty=5100 price=31.43 comm=40.07
+2026-05-10 22:46:24.798 | INFO     | quant.engine.backtest:run:94 - Backtest finished: 468 bars, 11 trades
+INFO:     127.0.0.1:43499 - "POST /api/backtest/run HTTP/1.1" 200 OK
+2026-05-10 23:00:29.727 | DEBUG    | quant.data.cache:load_cache:36 - Loading cache for 601179
+2026-05-10 23:00:29.728 | INFO     | quant.data.tushare_feed:subscribe:105 - Subscribed 601179: 468 bars
+2026-05-10 23:00:29.728 | INFO     | quant.engine.backtest:run:39 - Backtest started
+2026-05-10 23:00:29.750 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 601179 qty=40200 price=7.49 comm=75.25
+2026-05-10 23:00:29.764 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 601179 qty=20100 price=8.79 comm=44.15
+2026-05-10 23:00:29.768 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 601179 qty=20100 price=8.05 comm=40.44
+2026-05-10 23:00:29.770 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 601179 qty=39000 price=7.98 comm=77.80
+2026-05-10 23:00:29.775 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 601179 qty=39000 price=7.47 comm=72.80
+2026-05-10 23:00:29.827 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 601179 qty=33900 price=9.09 comm=77.04
+2026-05-10 23:00:29.829 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 601179 qty=33900 price=7.96 comm=67.46
+2026-05-10 23:00:29.831 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 601179 qty=35500 price=8.24 comm=73.13
+2026-05-10 23:00:29.849 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 601179 qty=17700 price=9.61 comm=42.52
+2026-05-10 23:00:29.854 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 601179 qty=17800 price=9.17 comm=40.81
+2026-05-10 23:00:29.856 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 601179 qty=33600 price=9.22 comm=77.45
+2026-05-10 23:00:29.862 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 601179 qty=16800 price=11.40 comm=47.88
+2026-05-10 23:00:29.879 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 601179 qty=16800 price=14.78 comm=62.08
+2026-05-10 23:00:29.894 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 601179 qty=20300 price=16.92 comm=85.87
+2026-05-10 23:00:29.897 | INFO     | quant.engine.backtest:run:94 - Backtest finished: 468 bars, 14 trades
+INFO:     127.0.0.1:42341 - "POST /api/backtest/run HTTP/1.1" 200 OK
+2026-05-10 23:03:16.578 | DEBUG    | quant.data.cache:load_cache:36 - Loading cache for 601179
+2026-05-10 23:03:16.579 | INFO     | quant.data.tushare_feed:subscribe:105 - Subscribed 601179: 468 bars
+2026-05-10 23:03:16.579 | INFO     | quant.engine.backtest:run:39 - Backtest started
+2026-05-10 23:03:16.599 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 601179 qty=40200 price=7.49 comm=75.25
+2026-05-10 23:03:16.615 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 601179 qty=20100 price=8.79 comm=44.15
+2026-05-10 23:03:16.620 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 601179 qty=20100 price=8.05 comm=40.44
+2026-05-10 23:03:16.622 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 601179 qty=39000 price=7.98 comm=77.80
+2026-05-10 23:03:16.625 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 601179 qty=39000 price=7.47 comm=72.80
+2026-05-10 23:03:16.672 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 601179 qty=33900 price=9.09 comm=77.04
+2026-05-10 23:03:16.675 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 601179 qty=33900 price=7.96 comm=67.46
+2026-05-10 23:03:16.677 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 601179 qty=35500 price=8.24 comm=73.13
+2026-05-10 23:03:16.694 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 601179 qty=17700 price=9.61 comm=42.52
+2026-05-10 23:03:16.698 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 601179 qty=17800 price=9.17 comm=40.81
+2026-05-10 23:03:16.701 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 601179 qty=33600 price=9.22 comm=77.45
+2026-05-10 23:03:16.707 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 601179 qty=16800 price=11.40 comm=47.88
+2026-05-10 23:03:16.723 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL SELL 601179 qty=16800 price=14.78 comm=62.08
+2026-05-10 23:03:16.739 | DEBUG    | quant.execution.simulated:submit_order:25 - FILL BUY 601179 qty=20300 price=16.92 comm=85.87
+2026-05-10 23:03:16.742 | INFO     | quant.engine.backtest:run:94 - Backtest finished: 468 bars, 14 trades
+INFO:     127.0.0.1:42653 - "POST /api/backtest/run HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42311 - "GET /api/strategy/list HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42325 - "GET /api/strategy/list HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42335 - "WebSocket /api/agent/chat" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     127.0.0.1:42337 - "GET /api/strategy/list HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42349 - "GET /api/strategy/list HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42351 - "WebSocket /api/agent/chat" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     127.0.0.1:42365 - "GET /api/strategy/list HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42379 - "GET /api/strategy/list HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44187 - "POST /api/screening/scan HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44537 - "GET /api/market/kline?symbol=000683&start_date=2025-11-10&end_date=2026-05-10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41369 - "GET /api/market/kline?symbol=000715&start_date=2025-11-10&end_date=2026-05-10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42921 - "GET /api/market/kline?symbol=000957&start_date=2025-11-10&end_date=2026-05-10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42929 - "GET /api/market/kline?symbol=002168&start_date=2025-11-10&end_date=2026-05-10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42939 - "GET /api/market/kline?symbol=002430&start_date=2025-11-10&end_date=2026-05-10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40941 - "GET /api/market/kline?symbol=002966&start_date=2025-11-10&end_date=2026-05-10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40949 - "GET /api/market/kline?symbol=002588&start_date=2025-11-10&end_date=2026-05-10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40965 - "GET /api/market/kline?symbol=002966&start_date=2025-11-10&end_date=2026-05-10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40981 - "GET /api/market/kline?symbol=688180&start_date=2025-11-10&end_date=2026-05-10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43747 - "GET /api/market/kline?symbol=688117&start_date=2025-11-10&end_date=2026-05-10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43529 - "GET /api/market/kline?symbol=605298&start_date=2025-11-10&end_date=2026-05-10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41615 - "GET /api/market/kline?symbol=605098&start_date=2025-11-10&end_date=2026-05-10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41621 - "GET /api/market/kline?symbol=605089&start_date=2025-11-10&end_date=2026-05-10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41633 - "GET /api/market/kline?symbol=603883&start_date=2025-11-10&end_date=2026-05-10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41979 - "GET /api/market/kline?symbol=601997&start_date=2025-11-10&end_date=2026-05-10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41995 - "GET /api/market/kline?symbol=601939&start_date=2025-11-10&end_date=2026-05-10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44021 - "GET /api/market/kline?symbol=601677&start_date=2025-11-10&end_date=2026-05-10 HTTP/1.1" 200 OK
