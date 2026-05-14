@@ -18,8 +18,6 @@ risk:
 
 broker:
   type: futu
-  host: "127.0.0.1"
-  port: 11111
 
 engine:
   initial_cash: 1000000

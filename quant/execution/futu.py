@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from loguru import logger
 
+from quant.config import get_settings
 from quant.core.events import OrderEvent, FillEvent
 from quant.core.order import OrderSide
 from .base import Broker
@@ -10,9 +11,10 @@ from .base import Broker
 class FutuBroker(Broker):
     """Live broker via Futu OpenAPI."""
 
-    def __init__(self, host: str = "127.0.0.1", port: int = 11111) -> None:
-        self.host = host
-        self.port = port
+    def __init__(self, host: str | None = None, port: int | None = None) -> None:
+        settings = get_settings().futu
+        self.host = host or settings.host
+        self.port = port or settings.port
         self._ctx = None
 
     def _connect(self):

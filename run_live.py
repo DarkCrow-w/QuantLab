@@ -7,6 +7,7 @@ import sys
 import yaml
 from loguru import logger
 
+from quant.config import get_settings
 from quant.data.akshare_feed import AKShareFeed
 from quant.engine.live import LiveEngine
 from quant.execution.futu import FutuBroker
@@ -44,9 +45,10 @@ def main() -> None:
     )
 
     broker_cfg = cfg.get("broker", {})
+    futu_settings = get_settings().futu
     broker = FutuBroker(
-        host=broker_cfg.get("host", "127.0.0.1"),
-        port=broker_cfg.get("port", 11111),
+        host=broker_cfg.get("host", futu_settings.host),
+        port=broker_cfg.get("port", futu_settings.port),
     )
 
     engine = LiveEngine(
