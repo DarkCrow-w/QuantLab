@@ -19,7 +19,7 @@ import argparse
 import shutil
 import sys
 import time
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 import pandas as pd
@@ -28,6 +28,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from quant.data import compute_all, get_store  # noqa: E402
+from quant.data.concurrency import bounded_futures  # noqa: E402
 from quant.data.indicators import indicator_versions  # noqa: E402
 from quant.data.schema import OHLCV_COLUMNS, normalize_kline, safe_write_parquet  # noqa: E402
 
@@ -93,8 +94,9 @@ def stage_copy(workers: int = 8) -> dict:
     ok = skipped = 0
     errors: list[str] = []
     with ProcessPoolExecutor(max_workers=workers) as ex:
-        futs = [ex.submit(_copy_one, p) for p in files]
-        for i, fut in enumerate(as_completed(futs)):
+        for i, (_, fut) in enumerate(
+            bounded_futures(ex, files, _copy_one, max_pending=workers * 2)
+        ):
             sym, status = fut.result()
             if status == "ok":
                 ok += 1
@@ -148,23 +150,9 @@ def stage_meta() -> dict:
     except Exception as e:
         print(f"[meta] calendar fetch failed: {e}; skipping")
 
-    # 3. last_update.parquet — 从 day 文件 dt.max() 推断
-    files = sorted(NEW_DIR.glob("*.parquet"))
-    last_rows = []
-    for p in files:
-        try:
-            df = pd.read_parquet(p, columns=["dt"])
-            if df.empty:
-                continue
-            last_rows.append({
-                "symbol": p.stem, "freq": "day",
-                "last_dt": df["dt"].max(),
-                "source": "migration",
-                "ts_updated": pd.Timestamp.now(),
-            })
-        except Exception:
-            continue
-    df_last = pd.DataFrame(last_rows)
+    # 3. Build the SQLite catalog once, then derive compatibility metadata.
+    store.rebuild_catalog()
+    df_last = store.last_update(freq="day")
     df_last.to_parquet(META_DIR / "last_update.parquet", index=False)
     print(f"[meta] last_update.parquet: {len(df_last)} rows")
 
@@ -193,8 +181,9 @@ def stage_indicators(workers: int = 8) -> dict:
     ok = 0
     errors: list[str] = []
     with ProcessPoolExecutor(max_workers=workers) as ex:
-        futs = [ex.submit(_materialize_one, p) for p in files]
-        for i, fut in enumerate(as_completed(futs)):
+        for i, (_, fut) in enumerate(
+            bounded_futures(ex, files, _materialize_one, max_pending=workers * 2)
+        ):
             sym, status = fut.result()
             if status == "ok":
                 ok += 1
@@ -221,6 +210,23 @@ def stage_resample() -> dict:
     month = derive_week_month(target_freq="month")
     print(f"[resample] month: {month.updated} updated, {month.failed} failed ({month.elapsed_s:.1f}s)")
     return {"week": week.updated, "month": month.updated}
+
+
+def stage_catalog() -> dict:
+    store = get_store()
+    count = store.rebuild_catalog()
+    print(f"[catalog] indexed {count} parquet files")
+    return {"indexed": count}
+
+
+def stage_snapshots() -> dict:
+    store = get_store()
+    total = 0
+    for freq in ("day", "week", "month"):
+        frame = store.get_latest_snapshot(freq=freq)
+        total += len(frame)
+        print(f"[snapshots] {freq}: {len(frame)} rows")
+    return {"snapshots": total}
 
 
 # ─── stage: flip ───────────────────────────────────────────────────────────
@@ -254,10 +260,15 @@ def stage_flip(confirm: bool = False) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--stage", choices=["copy", "meta", "indicators", "resample", "flip"])
+    parser.add_argument(
+        "--stage",
+        choices=[
+            "copy", "meta", "indicators", "resample", "catalog", "snapshots", "flip"
+        ],
+    )
     parser.add_argument("--all", action="store_true",
                         help="run copy + meta + indicators + resample (skip flip)")
-    parser.add_argument("--workers", type=int, default=8)
+    parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--confirm", action="store_true", help="required for --stage=flip")
     args = parser.parse_args()
 
@@ -269,6 +280,7 @@ def main() -> None:
         stage_meta()
         stage_indicators(workers=args.workers)
         stage_resample()
+        stage_catalog()
         return
     if args.stage == "copy":
         stage_copy(workers=args.workers)
@@ -278,6 +290,10 @@ def main() -> None:
         stage_indicators(workers=args.workers)
     elif args.stage == "resample":
         stage_resample()
+    elif args.stage == "catalog":
+        stage_catalog()
+    elif args.stage == "snapshots":
+        stage_snapshots()
     elif args.stage == "flip":
         stage_flip(confirm=args.confirm)
     else:
