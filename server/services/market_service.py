@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 
 from quant.data import INDICATORS, get_store
-from quant.data.schema import Freq
+from quant.data.schema import Freq, OHLCV_COLUMNS
 from server.models.backtest import KlineBar
 
 
@@ -20,6 +20,7 @@ def get_kline(
         start=date.fromisoformat(start_date),
         end=date.fromisoformat(end_date),
         with_indicators=with_indicators,
+        columns=None if with_indicators else OHLCV_COLUMNS,
     )
     if df.empty:
         return []

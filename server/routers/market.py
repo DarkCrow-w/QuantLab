@@ -1,12 +1,22 @@
 from __future__ import annotations
 
-import threading
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
+from quant.config import get_settings
+from quant.data import INDICATORS
+from quant.data.updater import (
+    DataSource,
+    derive_week_month,
+    fetch_all_a_symbols,
+    refresh_calendar,
+    refresh_universe,
+    update_universe,
+)
 from server.models.backtest import KlineBar
+from server.services.data_job_service import get_data_job_manager
 from server.services.market_service import (
     get_cache_status,
     get_calendar,
@@ -14,27 +24,9 @@ from server.services.market_service import (
     get_kline,
     get_universe,
 )
-from quant.data import INDICATORS
-from quant.data.updater import (
-    DataSource,
-    derive_week_month,
-    download_all_a,
-    fetch_all_a_symbols,
-    list_cached_symbols,
-    refresh_calendar,
-    refresh_universe,
-    update_all,
-    update_symbol,
-    update_universe,
-)
 
 Freq = Literal["day", "week", "month"]
-
 router = APIRouter(prefix="/api/market", tags=["market"])
-
-# ── 全 A 下载状态 ──
-_download_state: dict = {"running": False, "current": 0, "total": 0, "symbol": "", "result": None}
-_download_lock = threading.Lock()
 
 
 @router.get("/kline", response_model=list[KlineBar])
@@ -62,7 +54,6 @@ def api_indicator(
 
 @router.get("/indicators")
 def api_indicators_list():
-    """返回所有支持的指标 + 默认参数 + 输出列名。"""
     return [
         {
             "name": name,
@@ -76,96 +67,146 @@ def api_indicators_list():
 
 
 @router.get("/universe")
-def api_universe(market: str | None = Query(None, description="SH/SZ/BJ; 为空返回全部")):
+def api_universe(market: str | None = Query(None, description="SH/SZ/BJ")):
     return get_universe(market=market)
 
 
 @router.get("/calendar")
-def api_calendar(
-    start: str | None = Query(None),
-    end: str | None = Query(None),
-):
+def api_calendar(start: str | None = Query(None), end: str | None = Query(None)):
     return get_calendar(start=start, end=end)
 
 
 @router.get("/cache")
 def api_cache_list():
+    from quant.data.updater import list_cached_symbols
+
     return list_cached_symbols()
 
 
 @router.get("/cache/status")
 def api_cache_status():
-    """返回 last_update.parquet 内容，比 ``/cache`` 更详细（带 last_dt/source/ts_updated）。"""
     return get_cache_status()
 
 
 class UpdateRequest(BaseModel):
     symbols: list[str] | None = None
-    source: DataSource = "tushare"
+    source: DataSource = "tdx"
+    workers: int | None = None
+    materialize_indicators: bool = False
 
 
 @router.post("/update")
 def api_update(req: UpdateRequest = UpdateRequest()):
-    if req.symbols:
-        return [update_symbol(s, source=req.source) for s in req.symbols]
-    return update_all(source=req.source)
+    """Queue cached-symbol updates; supplying symbols creates a focused job."""
+    return get_data_job_manager().start(
+        "update",
+        source=req.source,
+        symbols=req.symbols,
+        workers=req.workers or get_settings().workers_for(req.source),
+        materialize_indicators=req.materialize_indicators,
+    )
 
 
 @router.get("/stocks")
-def api_stock_list(source: DataSource = Query("tushare", description="数据源: tushare 或 tdx")):
-    """获取全部 A 股上市股票列表。"""
+def api_stock_list(source: DataSource = Query("tdx")):
     return fetch_all_a_symbols(source=source)
 
 
 class DownloadAllRequest(BaseModel):
-    source: DataSource = "tushare"
+    source: DataSource = "tdx"
+    workers: int | None = None
+    materialize_indicators: bool = False
 
 
 @router.post("/download-all")
 def api_download_all(req: DownloadAllRequest = DownloadAllRequest()):
-    """启动全 A 股数据下载（后台执行）。"""
-    with _download_lock:
-        if _download_state["running"]:
-            return {"status": "already_running", **_download_state}
-        _download_state.update(running=True, current=0, total=0, symbol="", result=None)
-
-    def _run():
-        def on_progress(current: int, total: int, symbol: str, status: str):
-            _download_state.update(current=current, total=total, symbol=symbol)
-
-        try:
-            result = download_all_a(delay=0.35, on_progress=on_progress, source=req.source)
-            _download_state["result"] = result
-        except Exception as e:
-            _download_state["result"] = {"error": str(e)}
-        finally:
-            _download_state["running"] = False
-
-    threading.Thread(target=_run, daemon=True).start()
-    return {"status": "started"}
+    """Queue a resource-bounded whole-market download."""
+    return get_data_job_manager().start(
+        "download",
+        source=req.source,
+        workers=req.workers or get_settings().workers_for(req.source),
+        materialize_indicators=req.materialize_indicators,
+    )
 
 
 @router.get("/download-all/progress")
 def api_download_progress():
-    """查询全 A 下载进度。"""
-    return dict(_download_state)
+    """Compatibility endpoint backed by the unified job queue."""
+    return _latest_job()
 
 
-# ── v2 新端点：DataStore 后端，源回退链 + 指标自动重算 ─────────────────────
+@router.get("/jobs/current")
+def api_current_data_job():
+    return _latest_job()
+
+
+@router.get("/jobs/{job_id}")
+def api_data_job(job_id: str):
+    job = get_data_job_manager().get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="data job not found")
+    return job
+
+
+@router.post("/jobs/{job_id}/pause")
+def api_pause_data_job(job_id: str):
+    result = get_data_job_manager().pause(job_id)
+    if result["status"] == "not_found":
+        raise HTTPException(status_code=404, detail="data job not found")
+    if result["status"] == "invalid":
+        raise HTTPException(status_code=409, detail="data job cannot be paused")
+    return result
+
+
+@router.post("/jobs/{job_id}/resume")
+def api_resume_data_job(job_id: str):
+    result = get_data_job_manager().resume(job_id)
+    if result["status"] == "not_found":
+        raise HTTPException(status_code=404, detail="data job not found")
+    if result["status"] == "invalid":
+        raise HTTPException(status_code=409, detail="data job cannot be resumed")
+    return result
+
+
+@router.post("/jobs/{job_id}/cancel")
+def api_cancel_data_job(job_id: str):
+    result = get_data_job_manager().cancel(job_id)
+    if result["status"] == "not_found":
+        raise HTTPException(status_code=404, detail="data job not found")
+    if result["status"] == "invalid":
+        raise HTTPException(status_code=409, detail="data job cannot be cancelled")
+    return result
+
+
+def _latest_job() -> dict:
+    return get_data_job_manager().latest() or {
+        "running": False,
+        "status": "idle",
+        "completed": 0,
+        "total": 0,
+        "percent": 0,
+        "recent": [],
+    }
+
+
 class UpdateUniverseRequest(BaseModel):
     symbols: list[str] | None = None
     freq: Freq = "day"
     end_date: str | None = None
-    workers: int = 8
+    workers: int | None = None
     force: bool = False
+    materialize_indicators: bool = False
 
 
 @router.post("/v2/update")
 def api_v2_update(req: UpdateUniverseRequest = UpdateUniverseRequest()):
-    """v2 增量更新（DataStore 后端，TDX→AKShare→Tushare 回退链）。"""
     report = update_universe(
-        symbols=req.symbols, freq=req.freq, end_date=req.end_date,
-        workers=req.workers, force=req.force,
+        symbols=req.symbols,
+        freq=req.freq,
+        end_date=req.end_date,
+        workers=req.workers or get_settings().tdx.workers,
+        force=req.force,
+        recompute_indicators=req.materialize_indicators,
     )
     return {
         "total": report.total,
@@ -180,7 +221,6 @@ def api_v2_update(req: UpdateUniverseRequest = UpdateUniverseRequest()):
 
 @router.post("/v2/resample")
 def api_v2_resample(target_freq: Freq = Query("week")):
-    """从 day 重采样得到 week/month。"""
     if target_freq == "day":
         raise HTTPException(status_code=400, detail="target_freq must be week or month")
     report = derive_week_month(target_freq=target_freq)
@@ -194,16 +234,19 @@ def api_v2_resample(target_freq: Freq = Query("week")):
 
 @router.post("/v2/refresh-calendar")
 def api_v2_refresh_calendar():
-    n = refresh_calendar()
-    return {"open_days": n}
+    return {"open_days": refresh_calendar()}
 
 
 @router.post("/v2/refresh-universe")
 def api_v2_refresh_universe(source: DataSource = Query("akshare")):
     from quant.data.feeds import AKShareSource, TDXSource, TushareSource
-    src_map = {"akshare": AKShareSource(), "tdx": TDXSource(), "tushare": TushareSource()}
-    src = src_map.get(source)
-    if src is None:
+
+    sources = {
+        "akshare": AKShareSource(),
+        "tdx": TDXSource(),
+        "tushare": TushareSource(),
+    }
+    selected = sources.get(source)
+    if selected is None:
         raise HTTPException(status_code=400, detail=f"unsupported source: {source}")
-    n = refresh_universe(source=src)
-    return {"symbols": n, "source": source}
+    return {"symbols": refresh_universe(source=selected), "source": source}
