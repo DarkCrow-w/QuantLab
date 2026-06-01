@@ -25,6 +25,8 @@ dependencies = [
     # Agent framework
     "langchain>=0.3",
     "langchain-anthropic>=0.3",
+    "langchain-openai>=0.3",
+    "openai>=1.75",
     "langgraph>=0.4",
     "langgraph-supervisor>=0.0.10",
     # Vector database
