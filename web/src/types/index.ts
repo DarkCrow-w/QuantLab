@@ -94,7 +94,84 @@ export interface ScreenResult {
   elapsed_seconds: number;
 }
 
+// ── Multi-Factor Scoring ──
+
+export interface FactorWeights {
+  trend: number;
+  momentum: number;
+  volume: number;
+  dip: number;
+  risk: number;
+}
+
+export interface FactorScoreItem {
+  trend: number;
+  momentum: number;
+  volume: number;
+  dip: number;
+  risk: number;
+}
+
+export interface ScoredStock {
+  symbol: string;
+  score: number;
+  rating: string;
+  factors: FactorScoreItem;
+  reasons: string[];
+  warnings: string[];
+  signal_date: string;
+  close: number;
+  pct_chg: number;
+  volume: number;
+  amount: number;
+  sandglass: number;
+  wave: string;
+  kirin: string;
+}
+
+export interface ScoreResult {
+  scan_date: string;
+  total_scanned: number;
+  total_matched: number;
+  returned: number;
+  stocks: ScoredStock[];
+  elapsed_seconds: number;
+}
+
+export interface ScoreRequest {
+  scan_date?: string;
+  lookback?: number;
+  weights?: FactorWeights;
+  exclude_centipede?: boolean;
+  min_sandglass?: number;
+  min_amount?: number;
+  min_price?: number;
+  use_patterns?: boolean;
+  top_n?: number;
+  max_symbols?: number;
+}
+
+export interface FactorDef {
+  key: string;
+  label: string;
+  default_weight: number;
+  desc: string;
+}
+
 // ── Agent ──
+
+export type AgentMode =
+  | 'auto'
+  | 'quant'
+  | 'market'
+  | 'screening'
+  | 'backtest';
+
+export interface AgentModeOption {
+  key: AgentMode;
+  label: string;
+  agent: string;
+}
 
 export interface AgentToolCall {
   id: string;
@@ -139,4 +216,108 @@ export interface SessionSummary {
   message_count: number;
   created_at: string;
   last_active: string;
+}
+
+export interface AgentRuntimeStatus {
+  enabled: boolean;
+  provider: string;
+  model: string;
+  configured: boolean;
+  reason?: string | null;
+  modes?: AgentModeOption[];
+}
+
+export interface CompositeMetricParam {
+  key: string;
+  label: string;
+  default: number;
+  min: number;
+  max: number;
+  step: number;
+}
+
+export interface CompositeMetricDef {
+  key: string;
+  label: string;
+  category: string;
+  description: string;
+  unit: string;
+  value_type: 'number' | 'category';
+  operators: string[];
+  params: CompositeMetricParam[];
+  options: string[];
+  source: 'kline' | 'daily_basic';
+}
+
+export interface CompositeCondition {
+  id: string;
+  metric: string;
+  operator: string;
+  value: number | string | null;
+  value2?: number | null;
+  compare_metric?: string | null;
+  params: Record<string, number>;
+  periods: number;
+  weight: number;
+  required: boolean;
+  enabled: boolean;
+}
+
+export interface CompositeGroup {
+  id: string;
+  name: string;
+  logic: 'all' | 'any';
+  conditions: CompositeCondition[];
+}
+
+export interface FactorStrategyDraft {
+  name: string;
+  description: string;
+  logic: 'all' | 'any';
+  groups: CompositeGroup[];
+  min_score: number;
+  top_n: number;
+  lookback: number;
+}
+
+export interface FactorStrategy extends FactorStrategyDraft {
+  id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CompositeStock {
+  symbol: string;
+  matched: boolean;
+  score: number;
+  passed_conditions: number;
+  available_conditions: number;
+  total_conditions: number;
+  signal_date: string;
+  close: number;
+  pct_chg: number;
+  volume: number;
+  amount: number;
+  turnover_rate?: number | null;
+  reasons: string[];
+  failures: string[];
+  values: Record<string, {
+    metric: string;
+    value: number | string | null;
+    target: number | string | null;
+    passed: boolean;
+    available: boolean;
+  }>;
+}
+
+export interface CompositeScanResult {
+  strategy_id?: string | null;
+  strategy_name: string;
+  scan_date: string;
+  total_scanned: number;
+  total_matched: number;
+  returned: number;
+  stocks: CompositeStock[];
+  elapsed_seconds: number;
+  warnings: string[];
 }

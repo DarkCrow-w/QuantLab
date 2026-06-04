@@ -3,7 +3,7 @@
  */
 
 import axios from 'axios';
-import type { SessionSummary } from '../types';
+import type { AgentRuntimeStatus, SessionSummary } from '../types';
 
 const api = axios.create({ baseURL: '/api/agent', timeout: 120_000 });
 
@@ -24,4 +24,9 @@ export async function fetchSessions(): Promise<SessionSummary[]> {
 
 export async function deleteSession(sessionId: string): Promise<void> {
   await api.delete(`/sessions/${sessionId}`);
+}
+
+export async function fetchAgentRuntime(): Promise<AgentRuntimeStatus> {
+  const { data } = await api.get<AgentRuntimeStatus>('/runtime');
+  return data;
 }
