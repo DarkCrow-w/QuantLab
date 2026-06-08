@@ -1,30 +1,26 @@
-import { Space, Tag } from 'antd';
-import { LoadingOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { Tag } from 'antd';
+import { CheckCircleOutlined, LoadingOutlined } from '@ant-design/icons';
 import type { AgentStatus } from '../../types';
 
 export default function AgentStatusBar({ agents }: { agents: AgentStatus[] }) {
   if (agents.length === 0) return null;
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        gap: 8,
-        padding: '6px 16px',
-        background: '#0f1114',
-        borderBottom: '1px solid #1e2126',
-        flexWrap: 'wrap',
-      }}
-    >
-      {agents.map((a) => (
+    <div className="agent-status-bar">
+      {agents.map((agent) => (
         <Tag
-          key={a.name}
-          icon={a.status === 'working' ? <LoadingOutlined spin /> : <CheckCircleOutlined />}
-          color={a.status === 'working' ? 'processing' : 'success'}
-          style={{ fontSize: 11, margin: 0 }}
+          key={agent.name}
+          icon={
+            agent.status === 'working' ? (
+              <LoadingOutlined spin />
+            ) : (
+              <CheckCircleOutlined />
+            )
+          }
+          color={agent.status === 'working' ? 'processing' : 'success'}
         >
-          {a.displayName}
-          {a.task ? ` — ${a.task}` : ''}
+          {agent.displayName}
+          {agent.task ? ` · ${agent.task}` : ''}
         </Tag>
       ))}
     </div>

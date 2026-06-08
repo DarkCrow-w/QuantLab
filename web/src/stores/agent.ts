@@ -1,116 +1,302 @@
-/**
- * Agent 聊天 Zustand Store — 管理 WebSocket 连接、消息列表、流式状态。
- */
-
 import { create } from 'zustand';
-import type { AgentStatus, AgentToolCall, ChatMessage, ServerFrame, SessionSummary } from '../types';
-import { createAgentWebSocket, deleteSession, fetchSessions } from '../api/agent';
+import type {
+  AgentRuntimeStatus,
+  AgentMode,
+  AgentStatus,
+  AgentToolCall,
+  ChatMessage,
+  ServerFrame,
+  SessionSummary,
+} from '../types';
+import {
+  createAgentWebSocket,
+  deleteSession,
+  fetchAgentRuntime,
+  fetchSessions,
+} from '../api/agent';
+
+type ConnectionState = 'offline' | 'connecting' | 'connected' | 'error';
+type CachedConversation = {
+  sessionId: string | null;
+  messages: ChatMessage[];
+};
+
+const AGENT_MODES: AgentMode[] = [
+  'auto',
+  'quant',
+  'market',
+  'screening',
+  'backtest',
+];
+const CONVERSATION_STORAGE_KEY = 'quantlab.agent.conversations.v1';
+const SELECTED_MODE_STORAGE_KEY = 'quantlab.agent.selected-mode.v1';
+
+const emptyConversation = (): CachedConversation => ({
+  sessionId: null,
+  messages: [],
+});
+
+const loadConversationCache = (): Record<AgentMode, CachedConversation> => {
+  const initial = Object.fromEntries(
+    AGENT_MODES.map((mode) => [mode, emptyConversation()]),
+  ) as Record<AgentMode, CachedConversation>;
+  if (typeof window === 'undefined') return initial;
+  try {
+    const stored = JSON.parse(
+      window.localStorage.getItem(CONVERSATION_STORAGE_KEY) ?? '{}',
+    ) as Partial<Record<AgentMode, CachedConversation>>;
+    for (const mode of AGENT_MODES) {
+      const conversation = stored[mode];
+      if (conversation && Array.isArray(conversation.messages)) {
+        initial[mode] = {
+          sessionId: conversation.sessionId ?? null,
+          messages: conversation.messages,
+        };
+      }
+    }
+  } catch {
+    window.localStorage.removeItem(CONVERSATION_STORAGE_KEY);
+  }
+  return initial;
+};
+
+const loadSelectedMode = (): AgentMode => {
+  if (typeof window === 'undefined') return 'auto';
+  const stored = window.localStorage.getItem(SELECTED_MODE_STORAGE_KEY);
+  return AGENT_MODES.includes(stored as AgentMode)
+    ? (stored as AgentMode)
+    : 'auto';
+};
+
+let conversationCache = loadConversationCache();
+const initialSelectedMode = loadSelectedMode();
+
+const persistConversation = (
+  mode: AgentMode,
+  sessionId: string | null,
+  messages: ChatMessage[],
+) => {
+  conversationCache = {
+    ...conversationCache,
+    [mode]: { sessionId, messages },
+  };
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem(
+      CONVERSATION_STORAGE_KEY,
+      JSON.stringify(conversationCache),
+    );
+  }
+};
 
 interface AgentStore {
-  // 会话
+  selectedMode: AgentMode;
   sessionId: string | null;
   sessions: SessionSummary[];
-
-  // 消息
   messages: ChatMessage[];
-
-  // 流式状态
   isStreaming: boolean;
   streamingContent: string;
   activeAgents: AgentStatus[];
   pendingToolCalls: AgentToolCall[];
-
-  // WebSocket
   ws: WebSocket | null;
   connected: boolean;
-
-  // Actions
+  connectionState: ConnectionState;
+  connectionError: string | null;
+  runtime: AgentRuntimeStatus | null;
+  setAgentMode: (mode: AgentMode) => void;
   connect: () => void;
   disconnect: () => void;
+  reconnect: () => void;
+  loadRuntime: () => Promise<void>;
   sendMessage: (content: string, images?: string[]) => void;
+  stopGeneration: () => void;
   clearSession: () => void;
   loadSessions: () => Promise<void>;
   removeSession: (id: string) => Promise<void>;
 }
 
-let msgIdCounter = 0;
-const nextId = () => `msg_${Date.now()}_${++msgIdCounter}`;
-const toolCallId = () => `tc_${Date.now()}_${++msgIdCounter}`;
+let counter = 0;
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let reconnectAttempts = 0;
+let allowReconnect = true;
+let pendingPayload: Record<string, unknown> | null = null;
+let stopRequested = false;
+
+const nextId = (prefix = 'msg') => `${prefix}_${Date.now()}_${++counter}`;
+
+const assistantMessage = (content: string): ChatMessage => ({
+  id: nextId(),
+  role: 'assistant',
+  content,
+  timestamp: Date.now(),
+});
 
 export const useAgentStore = create<AgentStore>((set, get) => ({
-  sessionId: null,
+  selectedMode: initialSelectedMode,
+  sessionId: conversationCache[initialSelectedMode].sessionId,
   sessions: [],
-  messages: [],
+  messages: conversationCache[initialSelectedMode].messages,
   isStreaming: false,
   streamingContent: '',
   activeAgents: [],
   pendingToolCalls: [],
   ws: null,
   connected: false,
+  connectionState: 'offline',
+  connectionError: null,
+  runtime: null,
+
+  setAgentMode: (mode) => {
+    if (mode === get().selectedMode || get().isStreaming) return;
+    pendingPayload = null;
+    const current = get();
+    persistConversation(
+      current.selectedMode,
+      current.sessionId,
+      current.messages,
+    );
+    const next = conversationCache[mode] ?? emptyConversation();
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(SELECTED_MODE_STORAGE_KEY, mode);
+    }
+    set({
+      selectedMode: mode,
+      sessionId: next.sessionId,
+      messages: next.messages,
+      streamingContent: '',
+      activeAgents: [],
+      pendingToolCalls: [],
+      connectionError: null,
+    });
+  },
+
+  loadRuntime: async () => {
+    try {
+      const runtime = await fetchAgentRuntime();
+      set({ runtime, connectionError: runtime.reason ?? null });
+    } catch (error: unknown) {
+      set({
+        runtime: null,
+        connectionState: 'error',
+        connectionError:
+          error instanceof Error ? error.message : '无法读取 Agent 运行状态',
+      });
+    }
+  },
 
   connect: () => {
-    const { ws } = get();
-    if (ws && ws.readyState <= WebSocket.OPEN) return;
+    const current = get().ws;
+    if (
+      current &&
+      (current.readyState === WebSocket.OPEN ||
+        current.readyState === WebSocket.CONNECTING)
+    ) {
+      return;
+    }
 
+    allowReconnect = true;
+    set({ connectionState: 'connecting', connectionError: null });
     const socket = createAgentWebSocket();
+    set({ ws: socket });
 
     socket.onopen = () => {
-      set({ ws: socket, connected: true });
-    };
-
-    socket.onclose = () => {
-      set({ ws: null, connected: false });
-    };
-
-    socket.onerror = () => {
-      set({ ws: null, connected: false });
+      if (get().ws !== socket) return;
+      reconnectAttempts = 0;
+      set({
+        connected: true,
+        connectionState: 'connected',
+        connectionError: null,
+      });
+      if (pendingPayload) {
+        socket.send(JSON.stringify(pendingPayload));
+        pendingPayload = null;
+      }
     };
 
     socket.onmessage = (event) => {
       try {
-        const frame: ServerFrame = JSON.parse(event.data);
-        handleFrame(frame, set, get);
+        handleFrame(JSON.parse(event.data) as ServerFrame, set, get);
+        const state = get();
+        persistConversation(
+          state.selectedMode,
+          state.sessionId,
+          state.messages,
+        );
       } catch {
-        // ignore parse errors
+        set({ connectionError: '收到无法解析的 Agent 消息' });
       }
     };
 
-    set({ ws: socket });
+    socket.onerror = () => {
+      if (get().ws !== socket) return;
+      set({
+        connectionState: 'error',
+        connectionError: '研究服务连接失败',
+      });
+    };
+
+    socket.onclose = () => {
+      if (get().ws !== socket) return;
+      set({ ws: null, connected: false, connectionState: 'offline' });
+      if (get().isStreaming && !stopRequested) {
+        set((state) => ({
+          isStreaming: false,
+          messages: [
+            ...state.messages,
+            assistantMessage('连接中断，本次分析未完成。'),
+          ],
+        }));
+        const state = get();
+        persistConversation(
+          state.selectedMode,
+          state.sessionId,
+          state.messages,
+        );
+      }
+      stopRequested = false;
+      if (allowReconnect) {
+        reconnectAttempts += 1;
+        const delay = Math.min(15_000, 750 * 2 ** (reconnectAttempts - 1));
+        reconnectTimer = setTimeout(() => get().connect(), delay);
+      }
+    };
   },
 
   disconnect: () => {
-    const { ws } = get();
-    if (ws) {
-      ws.close();
-      set({ ws: null, connected: false });
-    }
+    allowReconnect = false;
+    pendingPayload = null;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    get().ws?.close();
+    set({
+      ws: null,
+      connected: false,
+      connectionState: 'offline',
+    });
   },
 
-  sendMessage: (content: string, images?: string[]) => {
-    const { ws, connected, sessionId } = get();
-    if (!ws || !connected) {
-      // 自动重连
-      get().connect();
-      // 延迟发送
-      setTimeout(() => get().sendMessage(content, images), 500);
-      return;
-    }
+  reconnect: () => {
+    allowReconnect = true;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    get().ws?.close();
+    set({ ws: null, connected: false });
+    setTimeout(() => get().connect(), 50);
+  },
 
-    // 添加用户消息到列表
-    const userMsg: ChatMessage = {
+  sendMessage: (content, images) => {
+    const text = content.trim();
+    if ((!text && !images?.length) || get().isStreaming) return;
+
+    const userMessage: ChatMessage = {
       id: nextId(),
       role: 'user',
-      content,
+      content: text,
       images,
       timestamp: Date.now(),
     };
-    set((s) => ({ messages: [...s.messages, userMsg] }));
-
-    // 发送到服务端
     const payload: Record<string, unknown> = {
       type: 'message',
-      session_id: sessionId,
-      content,
+      session_id: get().sessionId,
+      content: text,
+      agent_mode: get().selectedMode,
     };
     if (images?.length) {
       payload.images = images.map((data) => ({
@@ -118,12 +304,55 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
         media_type: 'image/png',
       }));
     }
-    ws.send(JSON.stringify(payload));
 
-    set({ isStreaming: true, streamingContent: '', activeAgents: [], pendingToolCalls: [] });
+    set((state) => ({
+      messages: [...state.messages, userMessage],
+      isStreaming: true,
+      streamingContent: '',
+      activeAgents: [],
+      pendingToolCalls: [],
+      connectionError: null,
+    }));
+    const state = get();
+    persistConversation(
+      state.selectedMode,
+      state.sessionId,
+      state.messages,
+    );
+
+    const socket = get().ws;
+    if (socket?.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify(payload));
+    } else {
+      pendingPayload = payload;
+      get().connect();
+    }
+  },
+
+  stopGeneration: () => {
+    if (!get().isStreaming) return;
+    stopRequested = true;
+    pendingPayload = null;
+    get().ws?.close(1000, 'cancelled');
+    set((state) => ({
+      isStreaming: false,
+      streamingContent: '',
+      activeAgents: [],
+      pendingToolCalls: [],
+      messages: [...state.messages, assistantMessage('已停止本次分析。')],
+    }));
+    const state = get();
+    persistConversation(
+      state.selectedMode,
+      state.sessionId,
+      state.messages,
+    );
   },
 
   clearSession: () => {
+    pendingPayload = null;
+    const mode = get().selectedMode;
+    persistConversation(mode, null, []);
     set({
       sessionId: null,
       messages: [],
@@ -135,52 +364,57 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
   },
 
   loadSessions: async () => {
-    const sessions = await fetchSessions();
-    set({ sessions });
+    try {
+      set({ sessions: await fetchSessions() });
+    } catch {
+      set({ sessions: [] });
+    }
   },
 
-  removeSession: async (id: string) => {
+  removeSession: async (id) => {
     await deleteSession(id);
-    set((s) => ({ sessions: s.sessions.filter((ss) => ss.session_id !== id) }));
-    if (get().sessionId === id) {
-      get().clearSession();
-    }
+    set((state) => ({
+      sessions: state.sessions.filter((session) => session.session_id !== id),
+    }));
+    if (get().sessionId === id) get().clearSession();
   },
 }));
 
-// ── WebSocket 帧处理 ──
-
 function handleFrame(
   frame: ServerFrame,
-  set: (fn: AgentStore | Partial<AgentStore> | ((s: AgentStore) => Partial<AgentStore>)) => void,
+  set: (
+    value:
+      | Partial<AgentStore>
+      | ((state: AgentStore) => Partial<AgentStore>),
+  ) => void,
   get: () => AgentStore,
 ) {
   switch (frame.type) {
     case 'session_init':
       set({ sessionId: frame.session_id ?? null });
       break;
-
     case 'text_delta':
       if (frame.content) {
-        set((s) => ({ streamingContent: s.streamingContent + frame.content }));
+        set((state) => ({
+          streamingContent: state.streamingContent + frame.content,
+        }));
       }
       break;
-
     case 'agent_dispatch':
       if (frame.agent) {
-        const displayNames: Record<string, string> = {
+        const names: Record<string, string> = {
           backtest_agent: '回测专家',
           screening_agent: '选股专家',
           market_agent: '行情专家',
-          rag_agent: '知识检索',
-          chart_agent: '图表分析',
+          quant_agent: 'Quant Agent',
+          supervisor: '研究主管',
         };
-        set((s) => ({
+        set((state) => ({
           activeAgents: [
-            ...s.activeAgents.filter((a) => a.name !== frame.agent),
+            ...state.activeAgents.filter((agent) => agent.name !== frame.agent),
             {
               name: frame.agent!,
-              displayName: displayNames[frame.agent!] ?? frame.agent!,
+              displayName: names[frame.agent!] ?? frame.agent!,
               status: 'working',
               task: frame.content,
             },
@@ -188,74 +422,79 @@ function handleFrame(
         }));
       }
       break;
-
     case 'agent_complete':
       if (frame.agent) {
-        set((s) => ({
-          activeAgents: s.activeAgents.map((a) =>
-            a.name === frame.agent ? { ...a, status: 'done' as const } : a,
+        set((state) => ({
+          activeAgents: state.activeAgents.map((agent) =>
+            agent.name === frame.agent
+              ? { ...agent, status: 'done' as const }
+              : agent,
           ),
         }));
       }
       break;
-
     case 'tool_call':
       if (frame.tool) {
-        const tc: AgentToolCall = {
-          id: toolCallId(),
-          tool: frame.tool,
-          agent: frame.agent,
-          input: frame.input ?? {},
-          status: 'running',
-        };
-        set((s) => ({ pendingToolCalls: [...s.pendingToolCalls, tc] }));
-      }
-      break;
-
-    case 'tool_result':
-      if (frame.tool) {
-        set((s) => ({
-          pendingToolCalls: s.pendingToolCalls.map((tc) =>
-            tc.tool === frame.tool && tc.status === 'running'
-              ? { ...tc, result: frame.data, status: 'done' as const }
-              : tc,
-          ),
+        set((state) => ({
+          pendingToolCalls: [
+            ...state.pendingToolCalls,
+            {
+              id: nextId('tool'),
+              tool: frame.tool!,
+              agent: frame.agent,
+              input: frame.input ?? {},
+              status: 'running',
+            },
+          ],
         }));
       }
       break;
-
+    case 'tool_result':
+      if (frame.tool) {
+        const calls = [...get().pendingToolCalls];
+        const index = calls.findIndex(
+          (call) => call.tool === frame.tool && call.status === 'running',
+        );
+        if (index >= 0) {
+          calls[index] = {
+            ...calls[index],
+            result: frame.data,
+            status: 'done',
+          };
+          set({ pendingToolCalls: calls });
+        }
+      }
+      break;
     case 'error':
-      // 将错误作为 assistant 消息显示
-      set((s) => ({
+      pendingPayload = null;
+      set((state) => ({
         isStreaming: false,
+        streamingContent: '',
+        activeAgents: [],
         messages: [
-          ...s.messages,
-          {
-            id: nextId(),
-            role: 'assistant',
-            content: `⚠️ ${frame.error ?? '未知错误'}`,
-            timestamp: Date.now(),
-          },
+          ...state.messages,
+          assistantMessage(frame.error ?? 'Agent 执行失败'),
         ],
       }));
       break;
-
     case 'done': {
-      // 将 streamingContent 和 pendingToolCalls 合并为最终 assistant 消息
       const { streamingContent, pendingToolCalls } = get();
-      const assistantMsg: ChatMessage = {
-        id: nextId(),
-        role: 'assistant',
-        content: streamingContent,
-        toolCalls: pendingToolCalls.length > 0 ? [...pendingToolCalls] : undefined,
-        timestamp: Date.now(),
-      };
-      set((s) => ({
+      set((state) => ({
         isStreaming: false,
         streamingContent: '',
         pendingToolCalls: [],
         activeAgents: [],
-        messages: [...s.messages, assistantMsg],
+        messages: [
+          ...state.messages,
+          {
+            id: nextId(),
+            role: 'assistant',
+            content: streamingContent || '分析已完成。',
+            toolCalls:
+              pendingToolCalls.length > 0 ? [...pendingToolCalls] : undefined,
+            timestamp: Date.now(),
+          },
+        ],
       }));
       break;
     }

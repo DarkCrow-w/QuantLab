@@ -1,142 +1,225 @@
 import { useEffect, useRef } from 'react';
-import { Spin } from 'antd';
-import { LoadingOutlined, RobotOutlined } from '@ant-design/icons';
+import { Button, Select, Spin, Tag, Tooltip } from 'antd';
+import {
+  ApartmentOutlined,
+  BarChartOutlined,
+  BulbOutlined,
+  LineChartOutlined,
+  LoadingOutlined,
+  PlusOutlined,
+  RadarChartOutlined,
+  ReloadOutlined,
+  RobotOutlined,
+} from '@ant-design/icons';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useAgentStore } from '../../stores/agent';
-import MessageBubble from './MessageBubble';
-import ToolCallCard from './ToolCallCard';
 import AgentStatusBar from './AgentStatusBar';
 import ChatInput from './ChatInput';
+import MessageBubble from './MessageBubble';
+import ToolCallCard from './ToolCallCard';
+import type { AgentMode } from '../../types';
+
+const modeFallbacks = [
+  { key: 'auto', label: '自动协作', agent: 'supervisor' },
+  { key: 'quant', label: 'Quant Agent', agent: 'quant_agent' },
+  { key: 'market', label: '行情分析', agent: 'market_agent' },
+  { key: 'screening', label: '智能选股', agent: 'screening_agent' },
+  { key: 'backtest', label: '策略回测', agent: 'backtest_agent' },
+] as const;
+
+const modeIcons: Record<AgentMode, React.ReactNode> = {
+  auto: <ApartmentOutlined />,
+  quant: <BulbOutlined />,
+  market: <LineChartOutlined />,
+  screening: <RadarChartOutlined />,
+  backtest: <BarChartOutlined />,
+};
+
+const modeDescriptions: Record<AgentMode, string> = {
+  auto: '主管自动调度行情、选股、回测和决策专家',
+  quant: '使用项目内行情、指标、选股和回测能力进行综合研究',
+  market: '专注 K 线、指标、趋势、支撑与压力',
+  screening: '专注策略扫描、候选排序与信号解释',
+  backtest: '专注策略回测、参数比较与风险评价',
+};
+
+const prompts = [
+  [
+    'Quant 视角诊断',
+    '从趋势、量价、波动与风险维度形成可验证的研究结论',
+    '请用 Quant 视角解释交易纪律，并给我一套可以每天执行的检查清单。',
+  ],
+  [
+    '分析一只股票',
+    '调用本地行情和技术指标，输出可验证的研究结论',
+    '请分析 000001 最近 120 个交易日的趋势、成交量、KDJ、RSI、MACD 和 BBI，并提示主要风险。',
+  ],
+  [
+    '扫描市场机会',
+    '调用 QuantLab 选股能力寻找候选标的',
+    '请使用多因子思路扫描当前市场，给出最值得进一步研究的 10 个候选，并解释筛选逻辑。',
+  ],
+  [
+    '设计组合策略',
+    '把自然语言想法转换为可执行的指标组合',
+    '请用 KDJ、RSI、MACD、成交量、DMI、DMA 和 BBI，设计一个趋势启动选股策略。',
+  ],
+];
 
 export default function ChatContainer() {
-  const messages = useAgentStore((s) => s.messages);
-  const isStreaming = useAgentStore((s) => s.isStreaming);
-  const streamingContent = useAgentStore((s) => s.streamingContent);
-  const activeAgents = useAgentStore((s) => s.activeAgents);
-  const pendingToolCalls = useAgentStore((s) => s.pendingToolCalls);
-  const connect = useAgentStore((s) => s.connect);
-  const connected = useAgentStore((s) => s.connected);
+  const store = useAgentStore();
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // 自动连接 WebSocket
   useEffect(() => {
-    connect();
-  }, [connect]);
+    store.loadRuntime();
+    store.connect();
+    return () => store.disconnect();
+    // Store actions are stable Zustand functions.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // 自动滚动到底部
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, streamingContent, pendingToolCalls]);
+  }, [store.messages, store.streamingContent, store.pendingToolCalls]);
+
+  const providerLabel =
+    store.runtime?.provider === 'deepseek'
+      ? 'DeepSeek'
+      : store.runtime?.provider === 'anthropic'
+        ? 'Anthropic'
+        : 'Agent';
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        background: '#0b0e11',
-      }}
-    >
-      {/* Agent 状态栏 */}
-      <AgentStatusBar agents={activeAgents} />
-
-      {/* 消息区域 */}
-      <div
-        style={{
-          flex: 1,
-          overflow: 'auto',
-          padding: '8px 0',
-        }}
-      >
-        {/* 欢迎信息 */}
-        {messages.length === 0 && !isStreaming && (
+    <div className="agent-shell">
+      <header className="agent-header">
+        <div>
+          <h1>AI 量化研究员</h1>
+          <p>{modeDescriptions[store.selectedMode]}</p>
+        </div>
+        <div className="agent-header-actions">
+          <Select
+            className="agent-mode-select"
+            value={store.selectedMode}
+            disabled={store.isStreaming}
+            onChange={(value: AgentMode) => store.setAgentMode(value)}
+            options={(store.runtime?.modes ?? modeFallbacks).map((mode) => ({
+              value: mode.key,
+              label: (
+                <span className="agent-mode-option">
+                  {modeIcons[mode.key]}
+                  {mode.label}
+                </span>
+              ),
+            }))}
+            aria-label="选择 AI Agent"
+          />
+          {store.runtime && (
+            <Tag color={store.runtime.enabled ? 'blue' : 'error'}>
+              {providerLabel} · {store.runtime.model}
+            </Tag>
+          )}
           <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '100%',
-              color: '#5e6673',
-              gap: 12,
-            }}
+            className={`connection-state ${
+              store.connectionState === 'connected' ? 'connected' : ''
+            }`}
           >
-            <RobotOutlined style={{ fontSize: 48, color: '#722ed1' }} />
-            <div style={{ fontSize: 16, color: '#848e9c' }}>QuantLab AI 助手</div>
-            <div style={{ fontSize: 12, maxWidth: 400, textAlign: 'center', lineHeight: 1.8 }}>
-              你可以用自然语言执行回测、选股和行情查询。例如：
-              <br />
-              "帮我用 MA 交叉策略回测 600519，2023 年全年"
-              <br />
-              "找出最近有买入信号的股票"
-              <br />
-              "查看 000001 最近 60 天的 K 线"
-            </div>
-            {!connected && (
-              <div style={{ fontSize: 11, color: '#f6465d' }}>
-                WebSocket 未连接，请检查后端是否启动
+            <i />
+            {store.connectionState === 'connected'
+              ? '研究服务在线'
+              : store.connectionState === 'connecting'
+                ? '正在连接'
+                : '研究服务离线'}
+          </div>
+          {store.connectionState !== 'connected' && (
+            <Tooltip title="重新连接">
+              <Button
+                size="small"
+                icon={<ReloadOutlined />}
+                onClick={store.reconnect}
+                aria-label="重新连接"
+              />
+            </Tooltip>
+          )}
+          <Button
+            size="small"
+            icon={<PlusOutlined />}
+            onClick={store.clearSession}
+            disabled={store.isStreaming}
+          >
+            新对话
+          </Button>
+        </div>
+      </header>
+
+      {store.connectionError && (
+        <div className="agent-connection-error">{store.connectionError}</div>
+      )}
+      <AgentStatusBar agents={store.activeAgents} />
+
+      <div className="agent-scroll">
+        {store.messages.length === 0 && !store.isStreaming && (
+          <div className="agent-welcome">
+            <div className="agent-welcome-inner">
+              <div className="agent-welcome-mark">
+                <RobotOutlined />
               </div>
-            )}
+              <h2>把研究问题交给协作式 AI 团队</h2>
+              <p>
+                {store.selectedMode === 'quant'
+                  ? 'Quant Agent 会核对研究周期和持仓背景，再调用真实数据工具形成可验证判断。'
+                  : '你可以让主管自动调度，也可以在右上角直接选择某个专业 Agent。所有研究结论均由项目内数据和工具支撑。'}
+              </p>
+              <div className="prompt-grid">
+                {prompts.map(([title, detail, prompt]) => (
+                  <button
+                    type="button"
+                    key={title}
+                    onClick={() => store.sendMessage(prompt)}
+                    disabled={store.isStreaming || store.runtime?.enabled === false}
+                  >
+                    <strong>{title}</strong>
+                    <span>{detail}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
-        {/* 历史消息 */}
-        {messages.map((msg) => (
-          <MessageBubble key={msg.id} message={msg} />
+        {store.messages.map((message) => (
+          <MessageBubble key={message.id} message={message} />
         ))}
 
-        {/* 流式输出区域 */}
-        {isStreaming && (
-          <div style={{ padding: '12px 16px', display: 'flex', gap: 10 }}>
-            <div
-              style={{
-                width: 30,
-                height: 30,
-                borderRadius: '50%',
-                background: '#722ed1',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}
-            >
-              <RobotOutlined style={{ color: '#fff', fontSize: 14 }} />
+        {store.isStreaming && (
+          <div className="agent-message">
+            <div className="agent-avatar">
+              <RobotOutlined />
             </div>
-            <div style={{ maxWidth: '75%', minWidth: 0 }}>
-              {/* 进行中的 tool calls */}
-              {pendingToolCalls.map((tc) => (
-                <ToolCallCard key={tc.id} toolCall={tc} />
+            <div className="agent-bubble-wrap">
+              {store.pendingToolCalls.map((toolCall) => (
+                <ToolCallCard key={toolCall.id} toolCall={toolCall} />
               ))}
-
-              {/* 流式文本 */}
-              {streamingContent ? (
-                <div
-                  style={{
-                    background: '#1a1d21',
-                    borderRadius: '12px 12px 12px 4px',
-                    padding: '10px 14px',
-                    color: '#eaecef',
-                    fontSize: 13,
-                    lineHeight: 1.6,
-                  }}
-                >
+              {store.streamingContent ? (
+                <div className="agent-bubble">
                   <div className="agent-markdown">
-                    <Markdown remarkPlugins={[remarkGfm]}>{streamingContent}</Markdown>
+                    <Markdown remarkPlugins={[remarkGfm]}>
+                      {store.streamingContent}
+                    </Markdown>
                   </div>
                   <span className="streaming-cursor" />
                 </div>
               ) : (
-                <Spin indicator={<LoadingOutlined spin style={{ color: '#722ed1' }} />} />
+                <div className="agent-thinking">
+                  <Spin indicator={<LoadingOutlined spin />} />
+                  <span>研究主管正在拆解问题</span>
+                </div>
               )}
             </div>
           </div>
         )}
-
         <div ref={bottomRef} />
       </div>
-
-      {/* 输入区域 */}
       <ChatInput />
     </div>
   );

@@ -1,26 +1,31 @@
 import { useRef, useState, type KeyboardEvent } from 'react';
-import { Button, Upload, Space, Tooltip } from 'antd';
-import { SendOutlined, PictureOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Button, Tooltip, Upload } from 'antd';
+import {
+  DeleteOutlined,
+  PictureOutlined,
+  SendOutlined,
+  StopOutlined,
+} from '@ant-design/icons';
 import { useAgentStore } from '../../stores/agent';
 
 export default function ChatInput() {
   const [text, setText] = useState('');
   const [images, setImages] = useState<string[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const sendMessage = useAgentStore((s) => s.sendMessage);
-  const isStreaming = useAgentStore((s) => s.isStreaming);
+  const store = useAgentStore();
+  const imageSupported = store.runtime?.provider === 'anthropic';
 
   const handleSend = () => {
-    const trimmed = text.trim();
-    if (!trimmed && images.length === 0) return;
-    sendMessage(trimmed, images.length > 0 ? images : undefined);
+    const content = text.trim();
+    if (!content && images.length === 0) return;
+    store.sendMessage(content, images.length ? images : undefined);
     setText('');
     setImages([]);
   };
 
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
+  const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
       handleSend();
     }
   };
@@ -28,112 +33,96 @@ export default function ChatInput() {
   const handleImageUpload = (file: File) => {
     const reader = new FileReader();
     reader.onload = () => {
-      const base64 = (reader.result as string).split(',')[1];
-      setImages((prev) => [...prev, base64]);
+      const base64 = String(reader.result).split(',')[1];
+      setImages((current) => [...current, base64]);
     };
     reader.readAsDataURL(file);
-    return false; // prevent default upload
+    return false;
   };
 
+  const disabled = store.runtime?.enabled === false;
+
   return (
-    <div style={{ borderTop: '1px solid #1e2126', padding: '12px 16px', background: '#0f1114' }}>
-      {/* Image previews */}
+    <div className="chat-composer">
       {images.length > 0 && (
-        <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
-          {images.map((img, i) => (
-            <div
-              key={i}
-              style={{
-                position: 'relative',
-                width: 64,
-                height: 64,
-                borderRadius: 6,
-                overflow: 'hidden',
-                border: '1px solid #2b2f36',
-              }}
-            >
+        <div className="chat-image-list">
+          {images.map((image, index) => (
+            <div className="chat-image-preview" key={`${image.slice(0, 16)}-${index}`}>
               <img
-                src={`data:image/png;base64,${img}`}
-                alt=""
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                src={`data:image/png;base64,${image}`}
+                alt="待分析图片"
               />
               <Button
                 size="small"
                 type="text"
                 icon={<DeleteOutlined />}
-                onClick={() => setImages((prev) => prev.filter((_, idx) => idx !== i))}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  right: 0,
-                  color: '#f6465d',
-                  background: 'rgba(0,0,0,0.6)',
-                  border: 'none',
-                  padding: 0,
-                  width: 20,
-                  height: 20,
-                  minWidth: 20,
-                }}
+                aria-label="移除图片"
+                onClick={() =>
+                  setImages((current) =>
+                    current.filter((_, itemIndex) => itemIndex !== index),
+                  )
+                }
               />
             </div>
           ))}
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+      <div className="chat-composer-inner">
         <Upload
           accept="image/*"
           showUploadList={false}
           beforeUpload={handleImageUpload}
           multiple
+          disabled={!imageSupported || store.isStreaming}
         >
-          <Tooltip title="上传图片">
+          <Tooltip
+            title={
+              imageSupported
+                ? '上传图表或截图'
+                : '当前 DeepSeek 模型暂使用文本研究模式'
+            }
+          >
             <Button
               icon={<PictureOutlined />}
-              size="small"
-              style={{
-                background: '#1a1d21',
-                borderColor: '#2b2f36',
-                color: '#848e9c',
-                height: 36,
-                width: 36,
-              }}
+              disabled={!imageSupported || store.isStreaming}
+              aria-label="上传图片"
             />
           </Tooltip>
         </Upload>
-
         <textarea
           ref={textareaRef}
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(event) => setText(event.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="输入消息... (Enter 发送, Shift+Enter 换行)"
+          placeholder={
+            disabled
+              ? '请先配置 Agent 模型 API Key'
+              : '输入研究问题，Enter 发送，Shift+Enter 换行'
+          }
+          disabled={disabled}
           rows={1}
-          style={{
-            flex: 1,
-            resize: 'none',
-            background: '#1a1d21',
-            border: '1px solid #2b2f36',
-            borderRadius: 8,
-            padding: '8px 12px',
-            color: '#eaecef',
-            fontSize: 13,
-            fontFamily: 'inherit',
-            outline: 'none',
-            minHeight: 36,
-            maxHeight: 120,
-            lineHeight: '20px',
-          }}
         />
-
-        <Button
-          type="primary"
-          icon={<SendOutlined />}
-          onClick={handleSend}
-          loading={isStreaming}
-          disabled={isStreaming || (!text.trim() && images.length === 0)}
-          style={{ height: 36, width: 36, padding: 0 }}
-        />
+        {store.isStreaming ? (
+          <Tooltip title="停止分析">
+            <Button
+              danger
+              icon={<StopOutlined />}
+              onClick={store.stopGeneration}
+              aria-label="停止分析"
+            />
+          </Tooltip>
+        ) : (
+          <Tooltip title="发送">
+            <Button
+              type="primary"
+              icon={<SendOutlined />}
+              onClick={handleSend}
+              disabled={disabled || (!text.trim() && images.length === 0)}
+              aria-label="发送"
+            />
+          </Tooltip>
+        )}
       </div>
     </div>
   );
