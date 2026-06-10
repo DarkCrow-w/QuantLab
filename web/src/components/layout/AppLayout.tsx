@@ -1,4 +1,5 @@
-import { Layout } from 'antd';
+import { useState } from 'react';
+import { Drawer, Grid, Layout } from 'antd';
 import Header from './Header';
 
 interface Props {
@@ -9,34 +10,42 @@ interface Props {
 }
 
 export default function AppLayout({ sidebar, activePage, onPageChange, children }: Props) {
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const screens = Grid.useBreakpoint();
+  const isMobile = !screens.lg;
+  const hasSidebar = sidebar !== null;
+
   return (
-    <Layout style={{ minHeight: '100vh', background: '#0b0e11' }}>
-      <Header activePage={activePage} onPageChange={onPageChange} />
-      <Layout style={{ background: '#0b0e11' }}>
-        {sidebar !== null && (
+    <Layout className="app-shell">
+      <Header
+        activePage={activePage}
+        onPageChange={onPageChange}
+        hasSidebar={hasSidebar}
+        onOpenSidebar={() => setDrawerOpen(true)}
+      />
+      <Layout className="app-body">
+        {hasSidebar && !isMobile && (
           <Layout.Sider
-            width={260}
-            style={{
-              background: '#0f1114',
-              borderRight: '1px solid #1e2126',
-              overflow: 'auto',
-              height: 'calc(100vh - 48px)',
-            }}
+            width={288}
+            className="workspace-sider"
           >
             {sidebar}
           </Layout.Sider>
         )}
-        <Layout.Content
-          style={{
-            padding: sidebar !== null ? 12 : 0,
-            overflow: sidebar !== null ? 'auto' : 'hidden',
-            height: 'calc(100vh - 48px)',
-            background: '#0b0e11',
-          }}
-        >
+        <Layout.Content className={`workspace-content ${hasSidebar ? 'with-sidebar' : 'agent-workspace'}`}>
           {children}
         </Layout.Content>
       </Layout>
+      <Drawer
+        open={drawerOpen && hasSidebar && isMobile}
+        onClose={() => setDrawerOpen(false)}
+        placement="left"
+        width="min(88vw, 320px)"
+        title="研究参数"
+        styles={{ body: { padding: 0 }, header: { minHeight: 52 } }}
+      >
+        {sidebar}
+      </Drawer>
     </Layout>
   );
 }

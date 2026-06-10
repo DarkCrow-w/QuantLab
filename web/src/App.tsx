@@ -17,22 +17,34 @@ export default function App() {
       theme={{
         algorithm: theme.darkAlgorithm,
         token: {
-          colorPrimary: '#1890ff',
-          borderRadius: 4,
-          colorBgContainer: '#141619',
-          colorBgElevated: '#1a1d21',
-          colorBorder: '#2b2f36',
-          colorText: '#eaecef',
-          colorTextSecondary: '#848e9c',
+          colorPrimary: '#2f8cff',
+          colorSuccess: '#19c37d',
+          colorWarning: '#e6a23c',
+          colorError: '#f05b67',
+          borderRadius: 6,
+          colorBgBase: '#090d10',
+          colorBgContainer: '#11181d',
+          colorBgElevated: '#162027',
+          colorBorder: '#263640',
+          colorText: '#e7eef3',
+          colorTextSecondary: '#8d9ba7',
           fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
           fontSize: 13,
         },
         components: {
           Button: {
             primaryShadow: 'none',
+            borderRadius: 6,
           },
           Card: {
             paddingLG: 16,
+          },
+          Segmented: {
+            itemSelectedBg: '#24323c',
+          },
+          Table: {
+            headerBg: '#162027',
+            rowHoverBg: '#162027',
           },
         },
       }}

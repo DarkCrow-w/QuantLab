@@ -11,19 +11,16 @@ interface MetricItem {
   sub?: string;
 }
 
-function formatPct(v: number): string {
-  return `${(v * 100).toFixed(2)}%`;
-}
+const formatPct = (value: number) => `${(value * 100).toFixed(2)}%`;
 
-function formatMoney(v: number): string {
-  if (v >= 1e8) return `${(v / 1e8).toFixed(2)}亿`;
-  if (v >= 1e4) return `${(v / 1e4).toFixed(2)}万`;
-  return v.toFixed(2);
+function formatMoney(value: number): string {
+  if (Math.abs(value) >= 1e8) return `${(value / 1e8).toFixed(2)} 亿`;
+  if (Math.abs(value) >= 1e4) return `${(value / 1e4).toFixed(2)} 万`;
+  return value.toFixed(2);
 }
 
 export default function MetricsCards({ metrics }: Props) {
   const pnl = metrics.final_equity - metrics.initial_cash;
-
   const items: MetricItem[] = [
     {
       label: '总收益率',
@@ -42,14 +39,14 @@ export default function MetricsCards({ metrics }: Props) {
       color: 'var(--loss)',
     },
     {
-      label: 'Sharpe',
+      label: '夏普比率',
       value: metrics.sharpe_ratio !== null ? metrics.sharpe_ratio.toFixed(3) : '--',
-      color: metrics.sharpe_ratio !== null && metrics.sharpe_ratio > 1 ? 'var(--profit)' : 'var(--text-primary)',
+      color: metrics.sharpe_ratio !== null && metrics.sharpe_ratio > 1 ? 'var(--profit)' : undefined,
     },
     {
       label: '胜率',
       value: metrics.win_rate !== null ? `${(metrics.win_rate * 100).toFixed(1)}%` : '--',
-      color: metrics.win_rate !== null && metrics.win_rate >= 0.5 ? 'var(--profit)' : 'var(--text-primary)',
+      color: metrics.win_rate !== null && metrics.win_rate >= 0.5 ? 'var(--profit)' : undefined,
     },
     {
       label: '盈亏比',
@@ -63,47 +60,12 @@ export default function MetricsCards({ metrics }: Props) {
   ];
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        gap: 1,
-        background: '#1e2126',
-        borderRadius: 8,
-        overflow: 'hidden',
-      }}
-    >
+    <div className="metric-grid">
       {items.map((item) => (
-        <div
-          key={item.label}
-          style={{
-            flex: 1,
-            background: '#141619',
-            padding: '12px 14px',
-            minWidth: 0,
-          }}
-        >
-          <div style={{ color: '#5e6673', fontSize: 11, marginBottom: 4, whiteSpace: 'nowrap' }}>
-            {item.label}
-          </div>
-          <div
-            className="mono"
-            style={{
-              color: item.color ?? 'var(--text-primary)',
-              fontSize: 18,
-              fontWeight: 600,
-              lineHeight: 1.2,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            {item.value}
-          </div>
-          {item.sub && (
-            <div style={{ color: '#5e6673', fontSize: 11, marginTop: 2 }} className="mono">
-              {item.sub}
-            </div>
-          )}
+        <div className="metric-item" key={item.label}>
+          <div className="metric-label">{item.label}</div>
+          <div className="metric-value" style={{ color: item.color }}>{item.value}</div>
+          {item.sub && <div className="metric-sub">{item.sub}</div>}
         </div>
       ))}
     </div>

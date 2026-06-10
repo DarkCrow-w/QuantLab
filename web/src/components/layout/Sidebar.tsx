@@ -17,7 +17,7 @@ const labelStyle: React.CSSProperties = {
   color: '#848e9c',
   fontSize: 11,
   textTransform: 'uppercase' as const,
-  letterSpacing: '0.5px',
+  letterSpacing: 0,
   marginBottom: 4,
   display: 'block',
 };
@@ -183,8 +183,13 @@ export default function Sidebar() {
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ flex: 1, overflow: 'auto', padding: '8px 0' }}>
+    <div className="sidebar-shell">
+      <div className="sidebar-context">
+        <small>STRATEGY LAB</small>
+        <strong>策略回测</strong>
+        <p>配置策略、标的、资金与风险边界</p>
+      </div>
+      <div className="sidebar-scroll">
         <Collapse
           items={collapseItems}
           defaultActiveKey={['strategy', 'symbol', 'date', 'capital', 'risk']}
@@ -196,21 +201,14 @@ export default function Sidebar() {
           style={{ background: 'transparent' }}
         />
       </div>
-      <div style={{ padding: '12px 16px', borderTop: '1px solid #1e2126' }}>
+      <div className="sidebar-footer">
         <Button
           type="primary"
           size="middle"
           block
           loading={store.loading}
           onClick={store.run}
-          style={{
-            height: 36,
-            fontWeight: 600,
-            fontSize: 13,
-            background: 'linear-gradient(135deg, #1890ff 0%, #722ed1 100%)',
-            border: 'none',
-            borderRadius: 6,
-          }}
+          icon={<ExperimentOutlined />}
         >
           {store.loading ? '运行中...' : '运行回测'}
         </Button>

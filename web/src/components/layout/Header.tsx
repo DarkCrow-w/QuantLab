@@ -1,357 +1,403 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
-import { Layout, Space, Typography, Tag, Button, Modal, Table, Progress, message, Segmented } from 'antd';
-import { ThunderboltFilled, SyncOutlined, DatabaseOutlined, CloudDownloadOutlined } from '@ant-design/icons';
-import { fetchCacheList, updateMarketData, startDownloadAll, getDownloadProgress } from '../../api/client';
-import type { CacheInfo, UpdateResult, DownloadProgress, DataSource } from '../../api/client';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Button,
+  Input,
+  Layout,
+  message,
+  Modal,
+  Progress,
+  Segmented,
+  Space,
+  Table,
+  Tag,
+  Tooltip,
+} from 'antd';
+import {
+  CloudDownloadOutlined,
+  CaretRightOutlined,
+  DatabaseOutlined,
+  ExperimentOutlined,
+  MenuOutlined,
+  PauseOutlined,
+  RadarChartOutlined,
+  RobotOutlined,
+  SearchOutlined,
+  SyncOutlined,
+  StopOutlined,
+  ThunderboltFilled,
+} from '@ant-design/icons';
+import {
+  cancelDataJob,
+  fetchCacheList,
+  getCurrentDataJob,
+  pauseDataJob,
+  resumeDataJob,
+  startDownloadAll,
+  updateMarketData,
+} from '../../api/client';
+import type { CacheInfo, DataJob, DataSource } from '../../api/client';
 
 interface HeaderProps {
   activePage: string;
   onPageChange: (page: string) => void;
+  hasSidebar?: boolean;
+  onOpenSidebar?: () => void;
 }
 
-export default function Header({ activePage, onPageChange }: HeaderProps) {
+const navItems = [
+  { value: 'backtest', label: '回测研究', icon: <ExperimentOutlined /> },
+  { value: 'screening', label: '智能选股', icon: <RadarChartOutlined /> },
+  { value: 'agent', label: 'AI 研究员', icon: <RobotOutlined /> },
+];
+
+const statusLabel: Record<string, string> = {
+  queued: '任务排队中',
+  running: '任务运行中',
+  paused: '任务已暂停',
+  cancelling: '正在取消',
+  cancelled: '任务已取消',
+  completed: '任务已完成',
+  failed: '任务失败',
+  interrupted: '任务被中断',
+  idle: '暂无任务',
+  updated: '已更新',
+  skipped: '已是最新',
+};
+
+export default function Header({
+  activePage,
+  onPageChange,
+  hasSidebar,
+  onOpenSidebar,
+}: HeaderProps) {
   const [open, setOpen] = useState(false);
   const [cache, setCache] = useState<CacheInfo[]>([]);
   const [loading, setLoading] = useState(false);
-  const [updating, setUpdating] = useState(false);
-  const [results, setResults] = useState<UpdateResult[] | null>(null);
-  const [downloading, setDownloading] = useState(false);
-  const [dlProgress, setDlProgress] = useState<DownloadProgress | null>(null);
+  const [controlLoading, setControlLoading] = useState(false);
+  const [job, setJob] = useState<DataJob | null>(null);
   const [source, setSource] = useState<DataSource>('tdx');
+  const [keyword, setKeyword] = useState('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastCompletedJobRef = useRef<string | undefined>(undefined);
 
   const stopPolling = useCallback(() => {
-    if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = null;
   }, []);
+
+  const refreshCache = useCallback(async () => {
+    setCache(await fetchCacheList());
+  }, []);
+
+  const pollJob = useCallback(async () => {
+    try {
+      const next = await getCurrentDataJob();
+      setJob(next);
+      if (!next.running && next.id && lastCompletedJobRef.current !== next.id) {
+        lastCompletedJobRef.current = next.id;
+        await refreshCache();
+        if (next.status === 'completed' && next.failed) {
+          message.warning(`数据任务完成，其中 ${next.failed} 只失败`);
+        } else if (next.status === 'completed') {
+          message.success('数据任务已完成');
+        }
+        if (next.status === 'failed') message.error(next.error || '数据任务失败');
+        if (next.status === 'cancelled') message.info('数据任务已取消，已完成的数据已保留');
+        stopPolling();
+      }
+    } catch {
+      stopPolling();
+    }
+  }, [refreshCache, stopPolling]);
+
+  const startPolling = useCallback(() => {
+    stopPolling();
+    void pollJob();
+    pollRef.current = setInterval(pollJob, 600);
+  }, [pollJob, stopPolling]);
 
   useEffect(() => () => stopPolling(), [stopPolling]);
 
-  const doDownloadAll = async () => {
-    setDownloading(true);
-    setDlProgress(null);
-    try {
-      const res = await startDownloadAll(source);
-      if (res.status === 'already_running') {
-        message.warning('下载任务已在运行中');
-      }
-      // Start polling
-      pollRef.current = setInterval(async () => {
-        try {
-          const p = await getDownloadProgress();
-          setDlProgress(p);
-          if (!p.running && (p.result || p.current > 0)) {
-            stopPolling();
-            setDownloading(false);
-            if (p.result && !('error' in p.result)) {
-              message.success(
-                `下载完成: ${p.result.success} 成功, ${p.result.skipped} 跳过, ${p.result.failed} 失败`,
-              );
-              setCache(await fetchCacheList());
-            } else if (p.result && 'error' in p.result) {
-              message.error(`下载出错: ${(p.result as { error: string }).error}`);
-            }
-          }
-        } catch {
-          // ignore polling errors
-        }
-      }, 2000);
-    } catch {
-      message.error('启动下载失败');
-      setDownloading(false);
-    }
-  };
-
   const openPanel = async () => {
     setOpen(true);
-    setResults(null);
     setLoading(true);
     try {
-      setCache(await fetchCacheList());
+      await Promise.all([refreshCache(), pollJob()]);
+      startPolling();
+    } catch {
+      message.error('读取本地数据状态失败');
     } finally {
       setLoading(false);
     }
   };
 
-  const doUpdate = async (symbols?: string[]) => {
-    setUpdating(true);
-    setResults(null);
+  const startUpdate = async (symbols?: string[]) => {
     try {
-      const res = await updateMarketData(symbols, source);
-      setResults(res);
-      const ok = res.filter((r) => r.new_bars > 0).length;
-      const skip = res.filter((r) => r.status === 'up_to_date').length;
-      const fail = res.filter((r) => r.status === 'error').length;
-      message.success(`更新完成: ${ok} 只有新数据, ${skip} 只已最新, ${fail} 只失败`);
-      setCache(await fetchCacheList());
+      const response = await updateMarketData(symbols, source);
+      setJob(response.job);
+      if (response.status === 'busy') {
+        message.info('已有数据任务运行中，请等待完成');
+      } else {
+        message.success(symbols?.length === 1 ? `已开始更新 ${symbols[0]}` : '已开始增量更新');
+      }
+      startPolling();
     } catch {
-      message.error('更新失败');
-    } finally {
-      setUpdating(false);
+      message.error('启动更新任务失败');
     }
   };
 
-  const columns = [
-    {
-      title: '代码',
-      dataIndex: 'symbol',
-      key: 'symbol',
-      width: 80,
-      render: (v: string) => <span className="mono" style={{ color: '#1890ff' }}>{v}</span>,
-    },
-    { title: 'K线数', dataIndex: 'bars', key: 'bars', width: 70, align: 'right' as const },
-    { title: '起始', dataIndex: 'start', key: 'start', width: 100 },
-    { title: '截止', dataIndex: 'end', key: 'end', width: 100 },
-    {
-      title: '',
-      key: 'action',
-      width: 60,
-      render: (_: unknown, r: CacheInfo) => (
-        <Button
-          type="link"
-          size="small"
-          icon={<SyncOutlined />}
-          loading={updating}
-          onClick={() => doUpdate([r.symbol])}
-          style={{ padding: 0, fontSize: 12 }}
-        >
-          更新
-        </Button>
-      ),
-    },
-  ];
+  const startDownload = async () => {
+    try {
+      const response = await startDownloadAll(source);
+      setJob(response.job);
+      if (response.status === 'busy') {
+        message.info('已有数据任务运行中，请等待完成');
+      } else {
+        message.success('已开始下载全市场数据');
+      }
+      startPolling();
+    } catch {
+      message.error('启动下载任务失败');
+    }
+  };
 
-  const resultColumns = [
+  const togglePause = async () => {
+    if (!job?.id) return;
+    setControlLoading(true);
+    try {
+      const response = job.status === 'paused'
+        ? await resumeDataJob(job.id)
+        : await pauseDataJob(job.id);
+      setJob(response.job);
+      message.success(response.status === 'resumed' ? '下载已继续' : '下载已暂停');
+      startPolling();
+    } catch {
+      message.error(job.status === 'paused' ? '继续任务失败' : '暂停任务失败');
+    } finally {
+      setControlLoading(false);
+    }
+  };
+
+  const cancelJob = () => {
+    if (!job?.id) return;
+    Modal.confirm({
+      title: '取消当前数据任务？',
+      content: '已经下载并写入的数据会保留，尚未处理的股票将停止下载。',
+      okText: '取消任务',
+      okButtonProps: { danger: true },
+      cancelText: '继续下载',
+      onOk: async () => {
+        setControlLoading(true);
+        try {
+          const response = await cancelDataJob(job.id!);
+          setJob(response.job);
+          message.info('正在取消，当前请求完成后停止');
+          startPolling();
+        } catch {
+          message.error('取消任务失败');
+        } finally {
+          setControlLoading(false);
+        }
+      },
+    });
+  };
+
+  const filteredCache = useMemo(() => {
+    const query = keyword.trim().toLowerCase();
+    if (!query) return cache;
+    return cache.filter((row) => row.symbol.toLowerCase().includes(query));
+  }, [cache, keyword]);
+
+  const activeSymbol = job?.running
+    ? job.current_symbol || job.result?.requested_symbols?.[0]
+    : undefined;
+  const busy = Boolean(job?.running);
+
+  const cacheColumns = [
     {
       title: '代码',
       dataIndex: 'symbol',
-      key: 'symbol',
-      width: 80,
-      render: (v: string) => <span className="mono" style={{ color: '#1890ff' }}>{v}</span>,
+      width: 100,
+      render: (value: string) => <span className="mono accent-text">{value}</span>,
     },
+    { title: 'K 线数', dataIndex: 'bars', width: 90, align: 'right' as const },
+    { title: '起始日期', dataIndex: 'start', width: 120 },
+    { title: '最新日期', dataIndex: 'end', width: 120 },
     {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      width: 90,
-      render: (v: string) => {
-        const map: Record<string, { color: string; text: string }> = {
-          updated: { color: '#0ecb81', text: '已更新' },
-          up_to_date: { color: '#848e9c', text: '已最新' },
-          no_new_data: { color: '#848e9c', text: '无新数据' },
-          error: { color: '#f6465d', text: '失败' },
-        };
-        const s = map[v] ?? { color: '#848e9c', text: v };
-        return <span style={{ color: s.color, fontSize: 12 }}>{s.text}</span>;
-      },
-    },
-    {
-      title: '新增',
-      dataIndex: 'new_bars',
-      key: 'new_bars',
-      width: 60,
-      align: 'right' as const,
-      render: (v: number) => (
-        <span className="mono" style={{ color: v > 0 ? '#0ecb81' : '#5e6673' }}>
-          +{v}
-        </span>
+      title: '操作',
+      width: 72,
+      fixed: 'right' as const,
+      render: (_: unknown, row: CacheInfo) => (
+        <Tooltip title={busy ? '已有数据任务运行中' : '单独更新该股票'}>
+          <Button
+            type="text"
+            size="small"
+            icon={<SyncOutlined spin={activeSymbol === row.symbol && busy} />}
+            disabled={busy}
+            onClick={() => startUpdate([row.symbol])}
+            aria-label={`更新 ${row.symbol}`}
+          />
+        </Tooltip>
       ),
     },
-    { title: '截止', dataIndex: 'end', key: 'end', width: 100 },
   ];
 
   return (
     <>
-      <Layout.Header
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 20px',
-          height: 48,
-          lineHeight: '48px',
-          background: '#0f1114',
-          borderBottom: '1px solid #1e2126',
-        }}
-      >
-        <Space size={10} align="center">
-          <div
-            style={{
-              width: 28,
-              height: 28,
-              borderRadius: 6,
-              background: 'linear-gradient(135deg, #1890ff 0%, #722ed1 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <ThunderboltFilled style={{ fontSize: 15, color: '#fff' }} />
+      <Layout.Header className="topbar">
+        <div className="topbar-left">
+          {hasSidebar && (
+            <Tooltip title="研究参数">
+              <Button
+                className="mobile-sidebar-trigger"
+                type="text"
+                icon={<MenuOutlined />}
+                onClick={onOpenSidebar}
+              />
+            </Tooltip>
+          )}
+          <div className="brand-mark"><ThunderboltFilled /></div>
+          <div className="brand-copy">
+            <strong>QuantLab</strong>
+            <span>RESEARCH TERMINAL</span>
           </div>
-          <Typography.Text
-            strong
-            style={{ color: '#eaecef', fontSize: 15, letterSpacing: '-0.3px' }}
-          >
-            QuantLab
-          </Typography.Text>
-          <Segmented
-            size="small"
-            value={activePage}
-            onChange={(v) => onPageChange(v as string)}
-            options={[
-              { label: '回测', value: 'backtest' },
-              { label: '选股', value: 'screening' },
-              { label: 'AI 助手', value: 'agent' },
-            ]}
-            style={{
-              background: '#1a1d21',
-              fontSize: 12,
-              height: 26,
-            }}
-          />
-        </Space>
-
-        <Space size={12}>
-          <Button
-            size="small"
-            icon={<DatabaseOutlined />}
-            onClick={openPanel}
-            style={{
-              background: '#1a1d21',
-              borderColor: '#2b2f36',
-              color: '#848e9c',
-              fontSize: 12,
-              height: 28,
-            }}
-          >
-            数据管理
-          </Button>
-          <Typography.Text style={{ color: '#5e6673', fontSize: 12 }}>v0.1.0</Typography.Text>
-        </Space>
+          <nav className="primary-nav" aria-label="工作区导航">
+            {navItems.map((item) => (
+              <button
+                key={item.value}
+                type="button"
+                className={activePage === item.value ? 'active' : ''}
+                onClick={() => onPageChange(item.value)}
+              >
+                {item.icon}
+                <span className="nav-label">{item.label}</span>
+              </button>
+            ))}
+          </nav>
+        </div>
+        <div className="topbar-actions">
+          <div className="market-status"><i /> 数据服务就绪</div>
+          <Button icon={<DatabaseOutlined />} onClick={openPanel}>数据中心</Button>
+          <span className="version-label">v0.1.0</span>
+        </div>
       </Layout.Header>
 
       <Modal
-        title={
-          <Space>
-            <DatabaseOutlined style={{ color: '#1890ff' }} />
-            <span>A股日线数据管理</span>
-          </Space>
-        }
+        title={<Space><DatabaseOutlined className="accent-text" />市场数据中心</Space>}
         open={open}
         onCancel={() => setOpen(false)}
-        width={560}
+        width={760}
         footer={
           <Space>
             <Button onClick={() => setOpen(false)}>关闭</Button>
-            <Button
-              type="primary"
-              icon={<SyncOutlined spin={updating} />}
-              loading={updating}
-              onClick={() => doUpdate()}
-            >
-              全部更新
+            <Button icon={<SyncOutlined />} disabled={busy} onClick={() => startUpdate()}>
+              更新全部缓存
             </Button>
             <Button
+              type="primary"
               icon={<CloudDownloadOutlined />}
-              loading={downloading}
-              onClick={doDownloadAll}
-              style={{
-                background: '#722ed1',
-                borderColor: '#722ed1',
-                color: '#fff',
-              }}
+              disabled={busy}
+              onClick={startDownload}
             >
-              下载全A股
+              下载全市场
             </Button>
           </Space>
         }
-        styles={{
-          body: { background: '#141619' },
-          mask: { background: 'rgba(0,0,0,0.6)' },
-        }}
-        style={{ top: 80 }}
       >
-        <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ color: '#848e9c', fontSize: 12, flexShrink: 0 }}>数据源</span>
+        <div className="data-center-toolbar">
+          <span>数据源</span>
           <Segmented
-            size="small"
             value={source}
-            onChange={(v) => setSource(v as DataSource)}
-            disabled={updating || downloading}
-            options={[
-              { label: '通达信', value: 'tdx' },
-              { label: 'TuShare', value: 'tushare' },
-            ]}
-            style={{ background: '#1a1d21' }}
+            disabled={busy}
+            onChange={(value) => setSource(value as DataSource)}
+            options={[{ label: '通达信', value: 'tdx' }, { label: 'TuShare', value: 'tushare' }]}
           />
-          <span style={{ color: '#5e6673', fontSize: 11 }}>
-            {source === 'tdx' ? '免费·无限流·不复权' : '需Token·有限流·前复权'}
-          </span>
+          <small>并发参数由统一配置管理，连续错误会自动停止</small>
         </div>
 
-        {downloading || (dlProgress && !dlProgress.running && dlProgress.result) ? (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ color: '#848e9c', fontSize: 12, marginBottom: 8 }}>
-              {downloading
-                ? `正在下载: ${dlProgress?.symbol || '准备中...'} (${dlProgress?.current || 0}/${dlProgress?.total || '?'})`
-                : '下载完成'}
+        {job && job.status !== 'idle' && (
+          <div className="download-progress">
+            <div>
+              <span>
+                {job.kind === 'download' ? '全市场下载' : '增量更新'}
+                {' · '}
+                {statusLabel[job.status] || job.status}
+                {job.current_symbol ? ` · ${job.current_symbol}` : ''}
+              </span>
+              <span className="mono">{job.completed} / {job.total}</span>
             </div>
             <Progress
-              percent={
-                dlProgress && dlProgress.total > 0
-                  ? Math.round((dlProgress.current / dlProgress.total) * 100)
-                  : 0
+              percent={job.percent}
+              size="small"
+              status={
+                job.status === 'failed'
+                  ? 'exception'
+                  : job.status === 'completed'
+                    ? 'success'
+                    : job.running && job.status !== 'paused'
+                      ? 'active'
+                      : 'normal'
               }
-              strokeColor={{ from: '#1890ff', to: '#722ed1' }}
-              size="small"
-              status={downloading ? 'active' : 'success'}
             />
-            {dlProgress?.result && !('error' in dlProgress.result) && !downloading && (
-              <div style={{ color: '#5e6673', fontSize: 12, marginTop: 4 }}>
-                共 {dlProgress.result.total} 只 | 成功 {dlProgress.result.success} | 跳过{' '}
-                {dlProgress.result.skipped} | 失败 {dlProgress.result.failed}
-                {dlProgress.result.errors.length > 0 && (
-                  <span style={{ color: '#f6465d' }}>
-                    {' '}
-                    | 错误: {dlProgress.result.errors.slice(0, 3).join(', ')}
-                    {dlProgress.result.errors.length > 3 && '...'}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-        ) : null}
-        {results ? (
-          <>
-            <div style={{ color: '#848e9c', fontSize: 12, marginBottom: 8 }}>更新结果</div>
-            <Table
-              dataSource={results}
-              columns={resultColumns}
-              rowKey="symbol"
-              size="small"
-              pagination={false}
-              loading={updating}
-              scroll={{ y: 300 }}
-            />
-          </>
-        ) : (
-          <>
-            <div style={{ color: '#848e9c', fontSize: 12, marginBottom: 8 }}>
-              已缓存 {cache.length} 只股票
+            <div className="job-summary">
+              <Tag color="success">更新 {job.updated || 0}</Tag>
+              <Tag>跳过 {job.skipped || 0}</Tag>
+              <Tag color={job.failed ? 'error' : 'default'}>失败 {job.failed || 0}</Tag>
+              {job.elapsed_s ? <span>耗时 {job.elapsed_s}s</span> : null}
+              {job.running && job.speed ? <span>{job.speed} 只/秒</span> : null}
+              {job.running && job.eta_s ? <span>预计剩余 {Math.ceil(job.eta_s / 60)} 分钟</span> : null}
+              {job.running && job.id && (
+                <Space size={4}>
+                  {job.status !== 'cancelling' && (
+                    <Button
+                      size="small"
+                      loading={controlLoading}
+                      icon={job.status === 'paused' ? <CaretRightOutlined /> : <PauseOutlined />}
+                      onClick={togglePause}
+                    >
+                      {job.status === 'paused' ? '继续' : '暂停'}
+                    </Button>
+                  )}
+                  <Button
+                    danger
+                    size="small"
+                    loading={controlLoading}
+                    disabled={job.status === 'cancelling'}
+                    icon={<StopOutlined />}
+                    onClick={cancelJob}
+                  >
+                    取消
+                  </Button>
+                </Space>
+              )}
             </div>
-            <Table
-              dataSource={cache}
-              columns={columns}
-              rowKey="symbol"
-              size="small"
-              pagination={false}
-              loading={loading}
-              scroll={{ y: 300 }}
-            />
-          </>
+          </div>
         )}
+
+        <div className="data-table-tools">
+          <div className="table-caption">本地已缓存 {cache.length} 个标的</div>
+          <Input
+            allowClear
+            prefix={<SearchOutlined />}
+            placeholder="搜索股票代码"
+            value={keyword}
+            onChange={(event) => setKeyword(event.target.value)}
+            style={{ width: 220 }}
+          />
+        </div>
+        <Table
+          dataSource={filteredCache}
+          columns={cacheColumns}
+          rowKey="symbol"
+          size="small"
+          pagination={{
+            pageSize: 50,
+            showSizeChanger: false,
+            showTotal: (total) => `共 ${total} 只`,
+          }}
+          loading={loading}
+          scroll={{ y: 380, x: 560 }}
+        />
       </Modal>
     </>
   );
