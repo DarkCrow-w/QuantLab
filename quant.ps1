@@ -5,7 +5,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
-$VenvPython = Join-Path $Root ".venv\Scripts\python.exe"
+$VenvDir = Join-Path $Root ".venv"
+$VenvPython = Join-Path $VenvDir "Scripts\python.exe"
+$Requirements = Join-Path $Root "requirements.txt"
 $ConfigFile = Join-Path $Root "config\quant.env"
 $ConfigExample = Join-Path $Root "config\quant.env.example"
 $PidDir = Join-Path $Root ".pids"
@@ -14,11 +16,53 @@ $BackendPid = Join-Path $PidDir "backend-windows.pid"
 $FrontendPid = Join-Path $PidDir "frontend-windows.pid"
 $BackendLog = Join-Path $LogDir "backend-windows.log"
 $FrontendLog = Join-Path $LogDir "frontend-windows.log"
-$WslPython = "/root/quantlab/quant/.venv/bin/python"
-$WslRoot = "/mnt/c/Users/14116/Documents/quantlab-windows/quant-public"
 
 function Write-Info([string]$Message) {
     Write-Host "[QuantLab] $Message" -ForegroundColor Cyan
+}
+
+function Invoke-Native([string]$FilePath, [string[]]$Arguments) {
+    $oldPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & $FilePath @Arguments
+        return $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $oldPreference
+    }
+}
+
+function Get-PythonLauncher {
+    if (Get-Command py.exe -ErrorAction SilentlyContinue) {
+        foreach ($version in @("3.12", "3.11", "3.10")) {
+            $oldPreference = $ErrorActionPreference
+            $ErrorActionPreference = "SilentlyContinue"
+            try {
+                & py.exe "-$version" -c "import sys; raise SystemExit(0 if sys.maxsize > 2**32 else 1)" 2>$null
+                if ($LASTEXITCODE -eq 0) {
+                    return @{ File = "py.exe"; Args = @("-$version") }
+                }
+            } finally {
+                $ErrorActionPreference = $oldPreference
+            }
+        }
+    }
+
+    $python = Get-Command python.exe -ErrorAction SilentlyContinue
+    if ($python) {
+        $version = & $python.Source -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+        if ($version -in @("3.10", "3.11", "3.12")) {
+            return @{ File = $python.Source; Args = @() }
+        }
+    }
+    throw "Python 3.10, 3.11, or 3.12 (64-bit) was not found. Install Python from https://www.python.org/downloads/windows/ and enable 'Add Python to PATH'."
+}
+
+function Assert-Node {
+    if (!(Get-Command node.exe -ErrorAction SilentlyContinue) -or
+        !(Get-Command npm.cmd -ErrorAction SilentlyContinue)) {
+        throw "Node.js was not found. Install the current Node.js LTS from https://nodejs.org/."
+    }
 }
 
 function Read-Config {
@@ -45,28 +89,24 @@ function Test-Url([string]$Url) {
     }
 }
 
-function Test-NativeBackend {
-    $previousPreference = $ErrorActionPreference
-    $ErrorActionPreference = "SilentlyContinue"
-    try {
-        & $VenvPython -c "import uvicorn, fastapi, pandas" 2>$null
-        return $LASTEXITCODE -eq 0
-    } finally {
-        $ErrorActionPreference = $previousPreference
-    }
+function Test-BackendEnvironment {
+    if (!(Test-Path -LiteralPath $VenvPython)) { return $false }
+    $code = Invoke-Native $VenvPython @(
+        "-c",
+        "import fastapi, pandas, pyarrow, uvicorn; import server.main"
+    )
+    return $code -eq 0
 }
 
 function Wait-Url([string]$Url, [string]$Name, [string]$LogFile) {
     for ($i = 0; $i -lt 60; $i++) {
-        if (Test-Url $Url) {
-            return
-        }
+        if (Test-Url $Url) { return }
         Start-Sleep -Milliseconds 500
     }
-    if (Test-Path -LiteralPath $LogFile) {
-        Get-Content -LiteralPath $LogFile -Tail 30
+    if (Test-Path -LiteralPath "$LogFile.error") {
+        Get-Content -LiteralPath "$LogFile.error" -Tail 30
     }
-    throw "$Name failed to start. See $LogFile"
+    throw "$Name failed to start. See $LogFile.error"
 }
 
 function Stop-ProcessTree([int]$ProcessId) {
@@ -94,33 +134,68 @@ function Invoke-Setup {
         Copy-Item -LiteralPath $ConfigExample -Destination $ConfigFile
         Write-Info "Created config\quant.env. Add your own tokens when needed."
     }
+
     if (!(Test-Path -LiteralPath $VenvPython)) {
-        Write-Info "Creating Python virtual environment..."
-        & py -3.11 -m venv (Join-Path $Root ".venv")
-    }
-    Write-Info "Checking backend dependencies..."
-    if (!(Test-NativeBackend)) {
-        Write-Info "Native packages are incomplete; trying PyPI..."
-        & $VenvPython -m pip install -e $Root -i https://pypi.org/simple
-    }
-    if ($LASTEXITCODE -ne 0) {
-        Write-Info "Native install is unavailable. The launcher will use the existing WSL Python environment."
-        & wsl.exe -d Ubuntu-24.04 -e $WslPython -c "import uvicorn, fastapi, pandas"
-        if ($LASTEXITCODE -ne 0) { throw "Neither Windows nor WSL backend dependencies are available." }
+        $launcher = Get-PythonLauncher
+        Write-Info "Creating a native Windows Python environment..."
+        $code = Invoke-Native $launcher.File @($launcher.Args + @("-m", "venv", $VenvDir))
+        if ($code -ne 0) { throw "Unable to create the Python virtual environment." }
     }
 
-    Write-Info "Installing frontend dependencies..."
-    Push-Location (Join-Path $Root "web")
-    try {
-        & npm.cmd ci
-        if ($LASTEXITCODE -ne 0) { throw "Frontend dependency installation failed." }
-    } finally {
-        Pop-Location
+    if (!(Test-BackendEnvironment)) {
+        Write-Info "Installing backend dependencies..."
+        $pipArgs = @(
+            "-m", "pip", "install",
+            "--disable-pip-version-check",
+            "--prefer-binary",
+            "-r", $Requirements
+        )
+        $code = Invoke-Native $VenvPython $pipArgs
+        if ($code -ne 0) {
+            Write-Info "Default package source failed; retrying with the official PyPI source..."
+            $code = Invoke-Native $VenvPython @(
+                $pipArgs + @("-i", "https://pypi.org/simple")
+            )
+        }
+        if ($code -ne 0) {
+            Write-Info "Official PyPI failed; retrying with the Tsinghua mirror..."
+            $code = Invoke-Native $VenvPython @(
+                $pipArgs + @("-i", "https://pypi.tuna.tsinghua.edu.cn/simple")
+            )
+        }
+        if ($code -ne 0) {
+            throw @"
+Backend dependency installation failed.
+
+This is usually a Python package index or proxy problem, not a WSL problem.
+Try one of these commands, then run start-windows.cmd again:
+
+  .venv\Scripts\python.exe -m pip install --prefer-binary -r requirements.txt
+  .venv\Scripts\python.exe -m pip install --prefer-binary -r requirements.txt -i https://pypi.org/simple
+  .venv\Scripts\python.exe -m pip install --prefer-binary -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+"@
+        }
+        if (!(Test-BackendEnvironment)) {
+            throw "Backend packages were installed, but the application import check failed."
+        }
+    }
+
+    Assert-Node
+    if (!(Test-Path -LiteralPath (Join-Path $Root "web\node_modules"))) {
+        Write-Info "Installing frontend dependencies..."
+        Push-Location (Join-Path $Root "web")
+        try {
+            $code = Invoke-Native "npm.cmd" @("ci")
+            if ($code -ne 0) { throw "Frontend dependency installation failed." }
+        } finally {
+            Pop-Location
+        }
     }
 }
 
 function Start-Services {
-    if (!(Test-Path -LiteralPath (Join-Path $Root "web\node_modules"))) {
+    if (!(Test-BackendEnvironment) -or
+        !(Test-Path -LiteralPath (Join-Path $Root "web\node_modules"))) {
         Invoke-Setup
     }
     New-Item -ItemType Directory -Force -Path $PidDir, $LogDir | Out-Null
@@ -135,23 +210,17 @@ function Start-Services {
 
     if (!(Test-Url $backendUrl)) {
         Write-Info "Starting backend..."
-        if (Test-NativeBackend) {
-            $backend = Start-Process -FilePath $VenvPython `
-                -ArgumentList @("-m", "uvicorn", "server.main:app", "--host", $backendHost, "--port", $backendPort) `
-                -WorkingDirectory $Root -WindowStyle Hidden -PassThru `
-                -RedirectStandardOutput $BackendLog -RedirectStandardError "$BackendLog.error"
-        } else {
-            $backend = Start-Process -FilePath "wsl.exe" `
-                -ArgumentList @("-d", "Ubuntu-24.04", "--cd", $WslRoot, "-e", $WslPython, "-m", "uvicorn", "server.main:app", "--host", $backendHost, "--port", $backendPort) `
-                -WorkingDirectory $Root -WindowStyle Hidden -PassThru `
-                -RedirectStandardOutput $BackendLog -RedirectStandardError "$BackendLog.error"
-        }
+        $backend = Start-Process -FilePath $VenvPython `
+            -ArgumentList @("-m", "uvicorn", "server.main:app", "--host", $backendHost, "--port", $backendPort) `
+            -WorkingDirectory $Root -WindowStyle Hidden -PassThru `
+            -RedirectStandardOutput $BackendLog -RedirectStandardError "$BackendLog.error"
         Set-Content -LiteralPath $BackendPid -Value $backend.Id
         Wait-Url $backendUrl "Backend" $BackendLog
     }
 
     if (!(Test-Url $frontendUrl)) {
         Write-Info "Starting frontend..."
+        $env:QUANT_BACKEND_PORT = $backendPort
         $frontend = Start-Process -FilePath "npm.cmd" `
             -ArgumentList @("run", "dev", "--", "--host", $frontendHost, "--port", $frontendPort) `
             -WorkingDirectory (Join-Path $Root "web") -WindowStyle Hidden -PassThru `

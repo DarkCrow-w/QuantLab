@@ -24,6 +24,27 @@ Git 忽略。
 cp config/quant.env.example config/quant.env
 ```
 
+### Windows 快速启动
+
+Windows 不需要 WSL。请先安装 64 位 Python 3.10、3.11 或 3.12，以及
+Node.js LTS，然后双击：
+
+```text
+start-windows.cmd
+```
+
+首次启动会自动创建 `.venv`、安装 `requirements.txt` 和前端依赖。服务默认
+运行在：
+
+- 前端：`http://127.0.0.1:5174`
+- 后端文档：`http://127.0.0.1:8001/docs`
+
+停止服务可双击 `stop-windows.cmd`。也可以在 PowerShell 中运行
+`.\quant.ps1 setup|start|stop|restart|status|logs`。
+
+如果 pip 下载失败，请根据启动器提示切换 PyPI 官方源或清华镜像；这属于网络或
+代理问题，不需要安装 WSL。
+
 修改配置后执行 `./quant.sh restart` 生效。系统环境变量的优先级高于配置
 文件；也可以通过 `QUANT_CONFIG_FILE=/path/to/quant.env` 使用其他配置文件。
 策略参数仍保留在 `configs/*.yaml`，它们属于每次回测或实盘任务的业务参数，
