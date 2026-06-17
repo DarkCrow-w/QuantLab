@@ -240,13 +240,27 @@ def api_v2_refresh_calendar():
 @router.post("/v2/refresh-universe")
 def api_v2_refresh_universe(source: DataSource = Query("akshare")):
     from quant.data.feeds import AKShareSource, TDXSource, TushareSource
+    from quant.data.updater import fetch_all_a_symbols
 
-    sources = {
-        "akshare": AKShareSource(),
-        "tdx": TDXSource(),
-        "tushare": TushareSource(),
-    }
-    selected = sources.get(source)
-    if selected is None:
+    class StaticUniverseSource:
+        def __init__(self, name: str, rows: list[dict]) -> None:
+            self.name = name
+            self._rows = rows
+
+        def list_symbols(self) -> list[dict]:
+            return self._rows
+
+    if source == "akshare":
+        selected = AKShareSource()
+    elif source == "tdx":
+        # TDX security-list pagination is often incomplete; this keeps the
+        # "tdx" user choice for subsequent fast行情下载 while using the stable
+        # full A-share universe provider behind fetch_all_a_symbols("tdx").
+        selected = StaticUniverseSource("tdx", fetch_all_a_symbols("tdx"))
+    elif source == "tushare":
+        selected = TushareSource()
+    elif source == "baostock":
+        selected = StaticUniverseSource("baostock", fetch_all_a_symbols("baostock"))
+    else:
         raise HTTPException(status_code=400, detail=f"unsupported source: {source}")
     return {"symbols": refresh_universe(source=selected), "source": source}

@@ -77,6 +77,7 @@ def metric_registry() -> list[MetricDef]:
         MetricDef("amplitude", "振幅", "price", "当日最高最低振幅", "%"),
         MetricDef("amount", "成交额", "volume", "当日成交额", "元"),
         MetricDef("volume", "成交量", "volume", "当日成交量", "股"),
+        MetricDef("volume_ratio_1", "较昨日量比", "volume", "成交量/上一交易日成交量", "倍"),
         MetricDef("volume_ratio_5", "量比(5日)", "volume", "成交量/5日均量", "倍"),
         MetricDef("volume_ratio_10", "量比(10日)", "volume", "成交量/10日均量", "倍"),
         MetricDef("obv_change_10", "OBV十日变化", "volume", "OBV相对十日前变化", "%"),
@@ -233,6 +234,8 @@ class MetricContext:
             return df["close"].pct_change() * 100
         if key == "amplitude":
             return (df["high"] - df["low"]) / df["close"].shift(1) * 100
+        if key == "volume_ratio_1":
+            return df["volume"] / df["volume"].shift(1).replace(0, np.nan)
         if key == "volume_ratio_5":
             return df["volume"] / df["volume"].rolling(5, min_periods=1).mean()
         if key == "volume_ratio_10":

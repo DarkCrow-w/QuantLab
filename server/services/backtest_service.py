@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+from itertools import product
 import math
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -15,8 +18,13 @@ from quant.strategy.examples.dip_buy import DipBuyStrategy
 from quant.strategy.examples.ma_cross import MACrossStrategy
 from quant.strategy.examples.vol_kdj_bbi import VolKDJBBIStrategy
 from quant.strategy.examples.bbi_kdj_trend import BBIKDJTrendStrategy
+from server.services.composite_backtest_strategy import CompositeRuleStrategy
+from server.services.factor_strategy_service import FactorStrategyStore
 
 from server.models.backtest import (
+    BacktestGridItem,
+    BacktestGridRequest,
+    BacktestGridResult,
     BacktestRequest,
     BacktestResult,
     EquityPoint,
@@ -165,8 +173,9 @@ def _compute_enhanced_metrics(
 
 
 def run_backtest(req: BacktestRequest) -> BacktestResult:
+    is_composite = req.strategy.startswith("composite:")
     registry_entry = STRATEGY_REGISTRY.get(req.strategy)
-    if registry_entry is None:
+    if registry_entry is None and not is_composite:
         raise ValueError(f"Unknown strategy: {req.strategy}")
 
     # Build components — fallback 链 TuShare -> Baostock -> AKShare
@@ -187,8 +196,15 @@ def run_backtest(req: BacktestRequest) -> BacktestResult:
     if feed is None:
         raise RuntimeError(f"All data sources failed; last error: {last_err}")
 
-    strategy_cls = registry_entry["cls"]
-    strategy = strategy_cls(params=req.strategy_params or {})
+    if is_composite:
+        strategy_id = req.strategy.split(":", 1)[1]
+        saved = FactorStrategyStore().get(strategy_id)
+        if saved is None:
+            raise ValueError(f"Unknown strategy: {strategy_id}")
+        strategy = CompositeRuleStrategy(saved, params=req.strategy_params or {})
+    else:
+        strategy_cls = registry_entry["cls"]
+        strategy = strategy_cls(params=req.strategy_params or {})
 
     risk_manager = BasicRiskManager(
         max_position_pct=req.max_position_pct,
@@ -257,3 +273,91 @@ def run_backtest(req: BacktestRequest) -> BacktestResult:
         trades=trades,
         kline_data=kline_data,
     )
+
+
+def run_backtest_grid(
+    req: BacktestGridRequest,
+    runner: Callable[[BacktestRequest], BacktestResult] = run_backtest,
+    save_result: Callable[[BacktestRequest, BacktestResult], str | None] | None = None,
+) -> BacktestGridResult:
+    """Run a deterministic parameter grid and keep failed combinations visible."""
+    requests = _expand_grid_requests(req)
+    results: list[BacktestGridItem] = []
+    for item_request in requests:
+        try:
+            result = runner(item_request)
+            run_id = save_result(item_request, result) if save_result else None
+            results.append(
+                BacktestGridItem(
+                    status="completed",
+                    strategy_params=item_request.strategy_params,
+                    request=item_request,
+                    metrics=result.metrics,
+                    run_id=run_id,
+                )
+            )
+        except Exception as e:
+            results.append(
+                BacktestGridItem(
+                    status="failed",
+                    strategy_params=item_request.strategy_params,
+                    request=item_request,
+                    error=str(e),
+                )
+            )
+
+    completed = sorted(
+        [item for item in results if item.status == "completed"],
+        key=lambda item: _grid_sort_value(item, req.sort_by),
+        reverse=req.sort_order == "desc",
+    )
+    failed = [item for item in results if item.status == "failed"]
+    ordered = completed + failed
+    return BacktestGridResult(
+        requested=len(requests),
+        completed=len(completed),
+        failed=len(failed),
+        sort_by=req.sort_by,
+        sort_order=req.sort_order,
+        best=completed[0] if completed else None,
+        results=ordered,
+    )
+
+
+def _expand_grid_requests(req: BacktestGridRequest) -> list[BacktestRequest]:
+    grid = {key: values for key, values in req.parameters.items() if values}
+    empty_keys = [key for key, values in req.parameters.items() if not values]
+    if empty_keys:
+        raise ValueError(f"Grid parameters cannot be empty: {', '.join(empty_keys)}")
+
+    if not grid:
+        return [req.base]
+
+    keys = sorted(grid.keys())
+    combinations = list(product(*(grid[key] for key in keys)))
+    if len(combinations) > req.max_runs:
+        raise ValueError(
+            f"Grid expands to {len(combinations)} runs, exceeding max_runs={req.max_runs}"
+        )
+
+    requests: list[BacktestRequest] = []
+    for values in combinations:
+        params = dict(req.base.strategy_params or {})
+        params.update({key: value for key, value in zip(keys, values, strict=True)})
+        requests.append(_copy_backtest_request(req.base, strategy_params=params))
+    return requests
+
+
+def _grid_sort_value(item: BacktestGridItem, sort_by: str) -> Any:
+    if item.metrics is None:
+        return float("-inf")
+    value = getattr(item.metrics, sort_by)
+    if value is None:
+        return float("-inf")
+    return value
+
+
+def _copy_backtest_request(req: BacktestRequest, **updates) -> BacktestRequest:
+    if hasattr(req, "model_copy"):
+        return req.model_copy(update=updates)
+    return req.copy(update=updates)

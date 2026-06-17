@@ -6,8 +6,8 @@ import type { ScoredStock } from '../types';
 import KlineChart, { type SubplotKey } from '../components/chart/KlineChart';
 import OverlaySelector, {
   SubplotSelector,
-  keysToOverlays,
 } from '../components/chart/OverlaySelector';
+import { keysToOverlays } from '../components/chart/overlayPresets';
 import FactorStrategyBuilder from '../components/screening/FactorStrategyBuilder';
 
 const RISE = '#f6465d';
@@ -246,7 +246,7 @@ export default function ScreeningPage() {
     return (
       <Alert
         type="error"
-        message="选股失败"
+        title="选股失败"
         description={error}
         showIcon
         style={{ margin: 20, background: '#1a1d21', border: '1px solid #f6465d40' }}

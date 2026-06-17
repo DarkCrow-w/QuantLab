@@ -104,7 +104,7 @@ export default function Sidebar() {
       key: 'date',
       label: <SectionHeader icon={<CalendarOutlined />} title="回测区间" />,
       children: (
-        <Space direction="vertical" style={{ width: '100%' }} size={8}>
+        <Space orientation="vertical" style={{ width: '100%' }} size={8}>
           <div>
             <Text style={labelStyle}>开始日期</Text>
             <DatePicker
@@ -148,7 +148,7 @@ export default function Sidebar() {
       key: 'risk',
       label: <SectionHeader icon={<SafetyCertificateOutlined />} title="风控参数" />,
       children: (
-        <Space direction="vertical" style={{ width: '100%' }} size={8}>
+        <Space orientation="vertical" style={{ width: '100%' }} size={8}>
           <div>
             <Text style={labelStyle}>最大仓位</Text>
             <InputNumber

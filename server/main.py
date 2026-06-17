@@ -2,7 +2,18 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from quant.config import get_settings
-from server.routers import backtest, market, screening, strategy
+from server.routers import (
+    backtest,
+    factors,
+    market,
+    research,
+    risk,
+    screening,
+    strategy,
+    strategy_assets,
+    system,
+    trading,
+)
 
 try:
     from server.agent.router import router as agent_router
@@ -13,7 +24,10 @@ except Exception as e:
     get_agent_runtime_status = None
     AGENT_IMPORT_ERROR = str(e)
 
-app = FastAPI(title="量化回测平台 API", version="0.1.0")
+APP_NAME = "QuantLab API"
+APP_VERSION = "0.1.0"
+
+app = FastAPI(title="量化回测平台 API", version=APP_VERSION)
 settings = get_settings()
 
 app.add_middleware(
@@ -26,15 +40,25 @@ app.add_middleware(
 
 app.include_router(backtest.router)
 app.include_router(strategy.router)
+app.include_router(strategy_assets.router)
 app.include_router(market.router)
 app.include_router(screening.router)
+app.include_router(factors.router)
+app.include_router(risk.router)
+app.include_router(system.router)
+app.include_router(trading.router)
+app.include_router(research.router)
 if agent_router is not None:
     app.include_router(agent_router)
 
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "service": APP_NAME,
+        "version": APP_VERSION,
+    }
 
 
 @app.get("/api/agent/status")

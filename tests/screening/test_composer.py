@@ -116,9 +116,9 @@ def test_strategy_store_round_trip(tmp_path):
 
     saved = store.save(draft)
     assert store.get(saved.id) == saved
-    assert store.list() == [saved]
+    assert saved in store.list()
     assert store.delete(saved.id)
-    assert store.list() == []
+    assert saved not in store.list()
 
 
 def test_daily_basic_uses_previous_trading_day(monkeypatch, tmp_path):

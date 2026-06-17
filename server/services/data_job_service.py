@@ -13,11 +13,13 @@ from typing import Literal
 from loguru import logger
 
 from quant.config import get_settings
+from quant.data.symbol_filter import is_a_share_symbol
 from quant.data.store import get_store
 from quant.data.updater import (
     DataOperationCancelled,
     DataSource,
     download_all_a,
+    fetch_all_a_symbols,
     update_symbols,
 )
 
@@ -463,13 +465,26 @@ def _local_download_symbols() -> tuple[list[str], str]:
         symbols = [
             str(symbol).zfill(6)
             for symbol in universe["symbol"].tolist()
-            if str(symbol).strip()
+            if is_a_share_symbol(symbol, include_bj=False)
         ]
         if symbols:
             return list(dict.fromkeys(symbols)), "symbols.parquet"
-    symbols = store.list_symbols("day")
-    if symbols:
-        return list(dict.fromkeys(symbols)), "catalog"
+    try:
+        remote = fetch_all_a_symbols("tdx")
+        if remote:
+            import pandas as pd
+
+            out_path = store.meta_path("symbols")
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            pd.DataFrame(remote).to_parquet(out_path, index=False)
+            symbols = [
+                str(item["symbol"]).zfill(6)
+                for item in remote
+                if str(item.get("symbol", "")).strip()
+            ]
+            return list(dict.fromkeys(symbols)), "remote:tdx"
+    except Exception as exc:
+        logger.warning(f"failed to refresh remote universe before download: {exc}")
     return [], "remote"
 
 

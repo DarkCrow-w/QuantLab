@@ -30,6 +30,7 @@ from .concurrency import bounded_futures
 from .feeds import AKShareSource, Source, TDXSource, TushareSource
 from .schema import ALL_FREQS, Freq, normalize_kline
 from .store import DataStore, get_store
+from .symbol_filter import filter_a_share_rows, is_a_share_symbol
 from .symbols import normalize
 from .tushare_feed import _fetch_daily as _tushare_fetch_daily
 from .tdx_feed import _fetch_daily as _tdx_fetch_daily
@@ -598,7 +599,9 @@ def fetch_all_a_symbols_akshare() -> list[dict]:
         return []
     records = []
     for _, r in df.iterrows():
-        code = str(r["code"])
+        code = str(r["code"]).zfill(6)
+        if not is_a_share_symbol(code):
+            continue
         records.append({
             "symbol": code,
             "name": r.get("name", ""),
@@ -606,18 +609,18 @@ def fetch_all_a_symbols_akshare() -> list[dict]:
             "market": "SH" if code.startswith(("6", "9")) else "SZ",
             "list_date": "",
         })
-    return records
+    return filter_a_share_rows(records)
 
 
 def fetch_all_a_symbols(source: DataSource = "tushare") -> list[dict]:
     """获取全部 A 股上市股票列表。"""
     if source == "tdx":
-        return fetch_all_a_symbols_tdx()
+        return filter_a_share_rows(fetch_all_a_symbols_tdx())
     if source == "akshare":
-        return fetch_all_a_symbols_akshare()
+        return filter_a_share_rows(fetch_all_a_symbols_akshare())
     if source == "baostock":
-        return fetch_all_a_symbols_baostock()
-    return fetch_all_a_symbols_tushare()
+        return filter_a_share_rows(fetch_all_a_symbols_baostock())
+    return filter_a_share_rows(fetch_all_a_symbols_tushare())
 
 
 def download_all_a(
@@ -1081,6 +1084,10 @@ def refresh_universe(source: Source | None = None, store: DataStore | None = Non
     rows = src.list_symbols()
     if not rows:
         logger.warning(f"[refresh_universe] {src.name} returned 0 symbols")
+        return 0
+    rows = filter_a_share_rows(rows, include_bj=src.name != "tdx")
+    if not rows:
+        logger.warning(f"[refresh_universe] {src.name} returned 0 A-share symbols after filtering")
         return 0
     df = pd.DataFrame(rows)
     out_path = store.meta_path("symbols")

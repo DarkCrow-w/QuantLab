@@ -1,15 +1,29 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { ConfigProvider, theme } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import AppLayout from './components/layout/AppLayout';
 import Sidebar from './components/layout/Sidebar';
 import ScreeningSidebar from './components/layout/ScreeningSidebar';
-import BacktestPage from './pages/BacktestPage';
-import ScreeningPage from './pages/ScreeningPage';
-import AgentPage from './pages/AgentPage';
+import Loading from './components/common/Loading';
+
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const DataPage = lazy(() => import('./pages/DataPage'));
+const TradingPage = lazy(() => import('./pages/TradingPage'));
+const ResearchPage = lazy(() => import('./pages/ResearchPage'));
+const StrategyPage = lazy(() => import('./pages/StrategyPage'));
+const FactorPage = lazy(() => import('./pages/FactorPage'));
+const RiskPage = lazy(() => import('./pages/RiskPage'));
+const BacktestPage = lazy(() => import('./pages/BacktestPage'));
+const ScreeningPage = lazy(() => import('./pages/ScreeningPage'));
+const AgentPage = lazy(() => import('./pages/AgentPage'));
 
 export default function App() {
-  const [activePage, setActivePage] = useState('backtest');
+  const [activePage, setActivePage] = useState('dashboard');
+  const sidebar = activePage === 'backtest'
+    ? <Sidebar />
+    : activePage === 'screening'
+      ? <ScreeningSidebar />
+      : null;
 
   return (
     <ConfigProvider
@@ -52,15 +66,31 @@ export default function App() {
       <AppLayout
         activePage={activePage}
         onPageChange={setActivePage}
-        sidebar={activePage === 'agent' ? null : activePage === 'backtest' ? <Sidebar /> : <ScreeningSidebar />}
+        sidebar={sidebar}
       >
-        {activePage === 'backtest' ? (
-          <BacktestPage />
-        ) : activePage === 'screening' ? (
-          <ScreeningPage />
-        ) : (
-          <AgentPage />
-        )}
+        <Suspense fallback={<Loading label="模块加载中..." />}>
+          {activePage === 'dashboard' ? (
+            <DashboardPage onPageChange={setActivePage} />
+          ) : activePage === 'data' ? (
+            <DataPage />
+          ) : activePage === 'trading' ? (
+            <TradingPage />
+          ) : activePage === 'research' ? (
+            <ResearchPage />
+          ) : activePage === 'strategy' ? (
+            <StrategyPage />
+          ) : activePage === 'factors' ? (
+            <FactorPage />
+          ) : activePage === 'risk' ? (
+            <RiskPage />
+          ) : activePage === 'backtest' ? (
+            <BacktestPage />
+          ) : activePage === 'screening' ? (
+            <ScreeningPage />
+          ) : (
+            <AgentPage />
+          )}
+        </Suspense>
       </AppLayout>
     </ConfigProvider>
   );

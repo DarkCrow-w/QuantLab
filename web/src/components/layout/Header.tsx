@@ -13,14 +13,20 @@ import {
   Tooltip,
 } from 'antd';
 import {
+  AlertOutlined,
+  BranchesOutlined,
   CloudDownloadOutlined,
   CaretRightOutlined,
   DatabaseOutlined,
   ExperimentOutlined,
+  FunctionOutlined,
   MenuOutlined,
   PauseOutlined,
+  ProfileOutlined,
   RadarChartOutlined,
   RobotOutlined,
+  DashboardOutlined,
+  SafetyCertificateOutlined,
   SearchOutlined,
   SyncOutlined,
   StopOutlined,
@@ -45,6 +51,13 @@ interface HeaderProps {
 }
 
 const navItems = [
+  { value: 'dashboard', label: '系统总览', icon: <DashboardOutlined /> },
+  { value: 'data', label: '数据平台', icon: <DatabaseOutlined /> },
+  { value: 'trading', label: '交易运行', icon: <SafetyCertificateOutlined /> },
+  { value: 'research', label: '研究资产', icon: <ProfileOutlined /> },
+  { value: 'strategy', label: '策略管理', icon: <BranchesOutlined /> },
+  { value: 'factors', label: '因子研究', icon: <FunctionOutlined /> },
+  { value: 'risk', label: '风险控制', icon: <AlertOutlined /> },
   { value: 'backtest', label: '回测研究', icon: <ExperimentOutlined /> },
   { value: 'screening', label: '智能选股', icon: <RadarChartOutlined /> },
   { value: 'agent', label: 'AI 研究员', icon: <RobotOutlined /> },

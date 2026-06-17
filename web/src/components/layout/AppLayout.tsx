@@ -32,7 +32,11 @@ export default function AppLayout({ sidebar, activePage, onPageChange, children 
             {sidebar}
           </Layout.Sider>
         )}
-        <Layout.Content className={`workspace-content ${hasSidebar ? 'with-sidebar' : 'agent-workspace'}`}>
+        <Layout.Content
+          className={`workspace-content ${
+            hasSidebar ? 'with-sidebar' : activePage === 'agent' ? 'agent-workspace' : 'standalone-workspace'
+          }`}
+        >
           {children}
         </Layout.Content>
       </Layout>
@@ -40,7 +44,7 @@ export default function AppLayout({ sidebar, activePage, onPageChange, children 
         open={drawerOpen && hasSidebar && isMobile}
         onClose={() => setDrawerOpen(false)}
         placement="left"
-        width="min(88vw, 320px)"
+        size="min(88vw, 320px)"
         title="研究参数"
         styles={{ body: { padding: 0 }, header: { minHeight: 52 } }}
       >

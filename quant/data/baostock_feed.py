@@ -13,6 +13,7 @@ from loguru import logger
 from quant.core.bar import Bar
 from quant.core.events import MarketEvent
 from .base import DataFeed
+from .symbol_filter import filter_a_share_rows, is_a_share_symbol
 from .cache import load_cache, save_cache
 
 # Baostock 用 module-global session，登录/查询/登出共享同一个 socket。
@@ -95,15 +96,15 @@ def fetch_all_a_symbols_baostock() -> list[dict]:
     if not rows:
         return []
     df = pd.DataFrame(rows, columns=rs.fields)
-    # 仅保留 A 股（沪 6/688/689、深 0/3）且在市
+    # 仅保留普通 A 股且在市，剔除指数、板块、基金和 B 股代码。
     df = df[df["status"] == "1"]
     df = df[df["type"] == "1"]  # 1 = 股票
     records: list[dict] = []
     for _, r in df.iterrows():
         code = r["code"]
-        if not code.startswith(("sh.6", "sh.9", "sh.688", "sz.0", "sz.3")):
-            continue
         sym = code.split(".", 1)[1]
+        if not is_a_share_symbol(sym):
+            continue
         records.append({
             "symbol": sym,
             "name": r.get("code_name", ""),
@@ -111,7 +112,7 @@ def fetch_all_a_symbols_baostock() -> list[dict]:
             "market": "SH" if code.startswith("sh.") else "SZ",
             "list_date": r.get("ipoDate", ""),
         })
-    return records
+    return filter_a_share_rows(records)
 
 
 class BaostockFeed(DataFeed):

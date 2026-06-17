@@ -1,5 +1,44 @@
 # quant 项目架构说明
 
+> 当前体验入口和最新功能说明见 [docs/QUANTLAB_GUIDE.md](docs/QUANTLAB_GUIDE.md)。
+
+## 快速上线验收
+
+QuantLab 现在以「系统总览、数据平台、回测研究、智能选股、AI 研究员」作为主控制台入口。
+首次 clone 后建议按下面顺序验证：
+
+```bash
+cp config/quant.env.example config/quant.env
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install --prefer-binary -r requirements.txt
+cd web && npm ci && cd ..
+.venv\Scripts\python.exe scripts\verify_clone_start.py
+.venv\Scripts\python.exe scripts\verify_deployment_config.py
+```
+
+Windows 用户也可以直接双击 `start-windows.cmd`，或运行：
+
+```powershell
+.\quant.ps1 start
+```
+
+启动后访问：
+
+- 前端控制台：`http://127.0.0.1:5174`
+- 后端 API 文档：`http://127.0.0.1:8001/docs`
+- 健康检查：`http://127.0.0.1:8001/api/health`
+
+容器化部署见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)，默认通过 `docker compose up --build -d`
+在 `http://127.0.0.1:8080` 暴露控制台。
+
+上线前至少确认：
+
+1. `scripts\verify_clone_start.py` 通过。
+2. 数据平台可以读取缓存状态，并能提交增量更新或全市场下载任务。
+3. 回测研究页能完成一次策略回测。
+4. 智能选股页能扫描本地已缓存股票。
+5. 如需 AI 研究员，已在 `config/quant.env` 配置对应模型 API Key。
+
 本文档整理 `quant` 项目的整体架构、各代码块职责，以及从前端到后端再到量化引擎的主要执行流程。
 
 ## 1. 项目定位

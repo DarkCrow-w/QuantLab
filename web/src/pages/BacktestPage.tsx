@@ -11,7 +11,8 @@ import { useBacktestStore } from '../stores/backtest';
 import MetricsCards from '../components/backtest/MetricsCards';
 import TradesTable from '../components/backtest/TradesTable';
 import KlineChart, { type SubplotKey } from '../components/chart/KlineChart';
-import OverlaySelector, { SubplotSelector, keysToOverlays } from '../components/chart/OverlaySelector';
+import OverlaySelector, { SubplotSelector } from '../components/chart/OverlaySelector';
+import { keysToOverlays } from '../components/chart/overlayPresets';
 import EquityChart from '../components/chart/EquityChart';
 import Loading from '../components/common/Loading';
 
@@ -75,7 +76,7 @@ export default function BacktestPage() {
     return (
       <Alert
         type="error"
-        message="回测失败"
+        title="回测失败"
         description={error}
         showIcon
         style={{ margin: 20 }}

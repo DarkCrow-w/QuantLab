@@ -132,7 +132,6 @@ export default function ScreeningSidebar() {
               size="small"
               min={0}
               max={100}
-              addonAfter="分"
               value={store.composerDraft.min_score}
               onChange={(value) =>
                 store.updateComposerDraft({ min_score: value ?? 0 })
@@ -146,7 +145,6 @@ export default function ScreeningSidebar() {
               size="small"
               min={30}
               max={1500}
-              addonAfter="日"
               value={store.composerDraft.lookback}
               onChange={(value) =>
                 store.updateComposerDraft({ lookback: value ?? 250 })
@@ -160,7 +158,6 @@ export default function ScreeningSidebar() {
               size="small"
               min={1}
               max={1000}
-              addonAfter="只"
               value={store.composerDraft.top_n}
               onChange={(value) =>
                 store.updateComposerDraft({ top_n: value ?? 100 })

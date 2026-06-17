@@ -4,6 +4,7 @@ from __future__ import annotations
 import pandas as pd
 from loguru import logger
 
+from ..symbol_filter import filter_a_share_rows, is_a_share_symbol
 from ..symbols import normalize
 
 _COL_MAP = {
@@ -46,13 +47,15 @@ class AKShareSource:
             code = str(r.code).zfill(6)
             if not code.isdigit() or len(code) != 6:
                 continue
-            if code.startswith(("6", "5", "9")):
+            if not is_a_share_symbol(code):
+                continue
+            if code.startswith(("4", "8", "920")):
+                m = "BJ"
+            elif code.startswith("6"):
                 m = "SH"
             elif code.startswith(("0", "3")):
                 m = "SZ"
-            elif code.startswith(("4", "8")):
-                m = "BJ"
             else:
                 continue
             out.append({"symbol": code, "name": getattr(r, "name", ""), "market": m})
-        return out
+        return filter_a_share_rows(out)

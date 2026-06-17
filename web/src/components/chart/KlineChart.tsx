@@ -7,6 +7,7 @@ export type Overlay =
   | { type: 'BBI'; color: string };
 
 export type SubplotKey = 'VOL' | 'MACD' | 'KDJ' | 'RSI';
+type ChartConfig = Record<string, unknown>;
 
 interface Props {
   kline: KlineBar[];
@@ -148,8 +149,8 @@ export default function KlineChart({ kline, trades, symbol, overlays, subplots }
     // ── 副图布局 ─────
     const N = subplots.length;
     const [mainPct, subPct] = gridLayout(N);
-    const grids: any[] = [{ left: 56, right: 16, top: 30, height: `${mainPct}%` }];
-    const xAxis: any[] = [
+    const grids: ChartConfig[] = [{ left: 56, right: 16, top: 30, height: `${mainPct}%` }];
+    const xAxis: ChartConfig[] = [
       {
         type: 'category', data: dates, gridIndex: 0,
         axisLine: { lineStyle: { color: '#1e2126' } },
@@ -158,7 +159,7 @@ export default function KlineChart({ kline, trades, symbol, overlays, subplots }
         splitLine: { show: false },
       },
     ];
-    const yAxis: any[] = [
+    const yAxis: ChartConfig[] = [
       {
         scale: true, gridIndex: 0,
         splitLine: { lineStyle: { color: '#1e2126', type: 'dashed' } },
@@ -170,7 +171,7 @@ export default function KlineChart({ kline, trades, symbol, overlays, subplots }
 
     // 主图位置（百分比起点：top=30 像素 + mainPct%；近似换算：30px ≈ 7%）
     let topCursor = 7 + mainPct + 2;
-    const subSeries: any[] = [];
+    const subSeries: ChartConfig[] = [];
     const legendNames: string[] = overlays.map(overlayLabel);
 
     subplots.forEach((sp, idx) => {

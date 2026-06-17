@@ -35,9 +35,115 @@ _DB_PATH = Path(__file__).resolve().parents[2] / "data" / "meta" / "screening.sq
 _SNAPSHOT_DIR = Path(__file__).resolve().parents[2] / "data" / "meta" / "daily_basic"
 
 
+def _condition(
+    cid: str,
+    metric: str,
+    operator: str,
+    value: float | int | str | None = 0,
+    *,
+    compare_metric: str | None = None,
+    weight: float = 1,
+    required: bool = True,
+) -> CompositeCondition:
+    return CompositeCondition(
+        id=cid,
+        metric=metric,
+        operator=operator,
+        value=value,
+        compare_metric=compare_metric,
+        weight=weight,
+        required=required,
+    )
+
+
+def _builtin_strategy_drafts() -> dict[str, FactorStrategyDraft]:
+    return {
+        "builtin_ma_cross": FactorStrategyDraft(
+            name="MA 均线交叉",
+            description="由原 MA 均线策略迁移：快线高于慢线时持有，跌回慢线下方时退出。",
+            logic="all",
+            groups=[
+                {
+                    "id": "ma_trend",
+                    "name": "均线趋势",
+                    "logic": "all",
+                    "conditions": [
+                        _condition("ma_fast_above_slow", "ma5", "above_metric", None, compare_metric="ma20"),
+                    ],
+                }
+            ],
+            min_score=100,
+            top_n=100,
+            lookback=250,
+        ),
+        "builtin_vol_kdj_bbi": FactorStrategyDraft(
+            name="量价KDJ+BBI",
+            description="由原量价 KDJ+BBI 策略迁移：低位 KDJ、放量、价格站上 BBI。",
+            logic="all",
+            groups=[
+                {
+                    "id": "vol_kdj_bbi",
+                    "name": "低位放量确认",
+                    "logic": "all",
+                    "conditions": [
+                        _condition("kdj_j_low", "kdj_j", "lt", 10),
+                        _condition("volume_expand", "volume_ratio_1", "gte", 1.5, weight=1.5),
+                        _condition("close_above_bbi", "close", "above_metric", None, compare_metric="bbi"),
+                    ],
+                }
+            ],
+            min_score=100,
+            top_n=100,
+            lookback=250,
+        ),
+        "builtin_bbi_kdj_trend": FactorStrategyDraft(
+            name="BBI趋势+KDJ择时",
+            description="由原 BBI 趋势策略迁移：价格在 BBI 上方，KDJ 低位改善，量能不弱。",
+            logic="all",
+            groups=[
+                {
+                    "id": "bbi_kdj_trend",
+                    "name": "趋势与择时",
+                    "logic": "all",
+                    "conditions": [
+                        _condition("close_above_bbi", "close", "above_metric", None, compare_metric="bbi"),
+                        _condition("kdj_j_timing", "kdj_j", "lt", 30),
+                        _condition("volume_ok", "volume_ratio_1", "gte", 1.0, required=False),
+                    ],
+                }
+            ],
+            min_score=70,
+            top_n=100,
+            lookback=250,
+        ),
+        "builtin_dip_buy": FactorStrategyDraft(
+            name="抄底（RSI+KDJ+VOL+BBI）",
+            description="由原抄底策略迁移：KDJ/RSI 超卖，价格低于 BBI，伴随放量。",
+            logic="all",
+            groups=[
+                {
+                    "id": "dip_buy",
+                    "name": "超跌放量",
+                    "logic": "all",
+                    "conditions": [
+                        _condition("kdj_j_oversold", "kdj_j", "lt", 10),
+                        _condition("rsi6_oversold", "rsi6", "lt", 25),
+                        _condition("below_bbi", "close", "below_metric", None, compare_metric="bbi"),
+                        _condition("volume_climax", "volume_ratio_1", "gte", 2.0, weight=1.5),
+                    ],
+                }
+            ],
+            min_score=100,
+            top_n=100,
+            lookback=250,
+        ),
+    }
+
+
 class FactorStrategyStore:
     def __init__(self, path: Path | str = _DB_PATH) -> None:
         self.path = Path(path)
+        self._seeding = False
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as conn:
             conn.execute(
@@ -61,6 +167,8 @@ class FactorStrategyStore:
         return conn
 
     def list(self) -> list[FactorStrategy]:
+        if not self._seeding:
+            self._seed_builtin_strategies()
         with self._connect() as conn:
             rows = conn.execute(
                 "SELECT * FROM factor_strategies ORDER BY updated_at DESC"
@@ -68,6 +176,8 @@ class FactorStrategyStore:
         return [self._from_row(row) for row in rows]
 
     def get(self, strategy_id: str) -> FactorStrategy | None:
+        if not self._seeding:
+            self._seed_builtin_strategies()
         with self._connect() as conn:
             row = conn.execute(
                 "SELECT * FROM factor_strategies WHERE id = ?", (strategy_id,)
@@ -104,6 +214,24 @@ class FactorStrategyStore:
                 "DELETE FROM factor_strategies WHERE id = ?", (strategy_id,)
             )
         return cursor.rowcount > 0
+
+    def _seed_builtin_strategies(self) -> None:
+        if self._seeding:
+            return
+        self._seeding = True
+        try:
+            with self._connect() as conn:
+                existing = {
+                    row["id"]
+                    for row in conn.execute(
+                        "SELECT id FROM factor_strategies WHERE id LIKE 'builtin_%'"
+                    ).fetchall()
+                }
+            for strategy_id, draft in _builtin_strategy_drafts().items():
+                if strategy_id not in existing:
+                    self.save(draft, strategy_id=strategy_id)
+        finally:
+            self._seeding = False
 
     @staticmethod
     def _from_row(row: sqlite3.Row) -> FactorStrategy:

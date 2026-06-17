@@ -11,6 +11,7 @@ import pandas as pd
 from loguru import logger
 
 from quant.config import PROJECT_ROOT, get_settings
+from ..symbol_filter import filter_a_share_rows, is_a_share_symbol
 from ..symbols import market as symbol_market
 from ..symbols import normalize, to_tdx_market
 
@@ -346,6 +347,8 @@ class TDXSource:
                     code = str(row.get("code", ""))
                     if not code.isdigit() or len(code) != 6:
                         continue
+                    if not is_a_share_symbol(code, include_bj=False):
+                        continue
                     if market_id == 1 and not code.startswith("6"):
                         continue
                     if market_id == 0 and not code.startswith(("0", "3")):
@@ -360,7 +363,7 @@ class TDXSource:
                 if len(rows) < 1000:
                     break
                 start += 1000
-        return out
+        return filter_a_share_rows(out, include_bj=False)
 
 
 def _empty_daily(reason: str) -> pd.DataFrame:

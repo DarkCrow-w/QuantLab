@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { BacktestResult, StrategyInfo } from '../types';
-import { fetchStrategyList, runBacktest } from '../api/client';
+import { fetchFactorStrategies, runBacktest } from '../api/client';
 
 interface BacktestStore {
   // Strategy list
@@ -30,23 +30,24 @@ interface BacktestStore {
 export const useBacktestStore = create<BacktestStore>((set, get) => ({
   strategies: [],
   loadStrategies: async () => {
-    const strategies = await fetchStrategyList();
+    const factorStrategies = await fetchFactorStrategies();
+    const strategies: StrategyInfo[] = factorStrategies.map((strategy) => ({
+      name: `composite:${strategy.id}`,
+      display_name: strategy.name,
+      params_schema: [],
+    }));
     set({ strategies });
     if (strategies.length > 0) {
       const first = strategies[0];
-      const params: Record<string, number> = {};
-      first.params_schema.forEach((p) => {
-        params[p.name] = p.default;
-      });
-      set({ strategy: first.name, strategyParams: params });
+      set({ strategy: first.name, strategyParams: {} });
     }
   },
 
   symbols: '600519',
   startDate: '2023-01-01',
   endDate: '2024-12-31',
-  strategy: 'ma_cross',
-  strategyParams: { fast_period: 5, slow_period: 20 },
+  strategy: 'composite:builtin_ma_cross',
+  strategyParams: {},
   initialCash: 1000000,
   maxPositionPct: 0.3,
   maxDrawdown: 0.2,

@@ -31,8 +31,8 @@ import { useScreeningStore } from '../../stores/screening';
 import KlineChart, { type SubplotKey } from '../chart/KlineChart';
 import OverlaySelector, {
   SubplotSelector,
-  keysToOverlays,
 } from '../chart/OverlaySelector';
+import { keysToOverlays } from '../chart/overlayPresets';
 
 const RISE = '#f6465d';
 const FALL = '#0ecb81';
@@ -88,6 +88,7 @@ const COMMON_METRIC_KEYS = [
   'macd_dea_custom',
   'macd_bar_custom',
   'volume',
+  'volume_ratio_1',
   'volume_ratio_5',
   'volume_ratio_10',
   'volume_ma_custom',
@@ -152,7 +153,6 @@ function MetricTarget({
       <InputNumber
         min={2}
         max={60}
-        addonAfter="期"
         value={condition.periods}
         onChange={(periods) => onChange({ periods: periods ?? 3 })}
       />
@@ -170,7 +170,6 @@ function MetricTarget({
   return (
     <InputNumber
       value={typeof condition.value === 'number' ? condition.value : 0}
-      addonAfter={metric?.unit || undefined}
       onChange={(value) => onChange({ value: value ?? 0 })}
     />
   );
@@ -264,7 +263,7 @@ function ConditionRow({
             min={param.min}
             max={param.max}
             step={param.step}
-            addonBefore={param.label}
+            aria-label={param.label}
             value={condition.params[param.key] ?? param.default}
             onChange={(value) =>
               patch({
@@ -314,7 +313,7 @@ function ConditionRow({
           min={0}
           max={100}
           step={0.5}
-          addonBefore="权重"
+          aria-label="权重"
           value={condition.weight}
           onChange={(weight) => patch({ weight: weight ?? 0 })}
         />
@@ -441,7 +440,7 @@ function ResultPanel() {
         <div><span>交易日期</span><strong>{composerResult.scan_date}</strong></div>
       </div>
       {composerResult.warnings.map((warning) => (
-        <Alert key={warning} type="warning" showIcon message={warning} />
+        <Alert key={warning} type="warning" showIcon title={warning} />
       ))}
       <Table
         className="factor-result-table"
@@ -571,7 +570,7 @@ export default function FactorStrategyBuilder() {
             closable
             type="error"
             showIcon
-            message="组合策略操作失败"
+            title="组合策略操作失败"
             description={error}
           />
         )}
@@ -590,7 +589,6 @@ export default function FactorStrategyBuilder() {
           <InputNumber
             min={0}
             max={100}
-            addonAfter="分"
             value={composerDraft.min_score}
             onChange={(min_score) => updateComposerDraft({ min_score: min_score ?? 0 })}
           />

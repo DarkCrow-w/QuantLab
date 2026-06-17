@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any, Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -56,3 +58,43 @@ class BacktestResult(BaseModel):
     equity_curve: list[EquityPoint]
     trades: list[TradeRecord]
     kline_data: dict[str, list[KlineBar]]
+
+
+GridSortKey = Literal[
+    "total_return",
+    "annual_return",
+    "max_drawdown",
+    "sharpe_ratio",
+    "win_rate",
+    "final_equity",
+]
+
+
+class BacktestGridRequest(BaseModel):
+    base: BacktestRequest = Field(default_factory=BacktestRequest)
+    parameters: dict[str, list[Any]] = Field(
+        default_factory=dict,
+        description="Parameter grid, for example {'fast_period': [5, 10], 'slow_period': [20, 30]}",
+    )
+    max_runs: int = Field(default=30, ge=1, le=100)
+    sort_by: GridSortKey = "total_return"
+    sort_order: Literal["asc", "desc"] = "desc"
+
+
+class BacktestGridItem(BaseModel):
+    status: Literal["completed", "failed"]
+    strategy_params: dict[str, Any]
+    request: BacktestRequest
+    metrics: PerformanceMetrics | None = None
+    run_id: str | None = None
+    error: str | None = None
+
+
+class BacktestGridResult(BaseModel):
+    requested: int
+    completed: int
+    failed: int
+    sort_by: GridSortKey
+    sort_order: Literal["asc", "desc"]
+    best: BacktestGridItem | None = None
+    results: list[BacktestGridItem]

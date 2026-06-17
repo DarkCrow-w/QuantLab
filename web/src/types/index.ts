@@ -13,6 +13,21 @@ export interface StrategyInfo {
   params_schema: ParamSchema[];
 }
 
+export interface StrategyAssetDraft {
+  name: string;
+  description: string;
+  base_strategy: string;
+  params: Record<string, number>;
+  tags: string[];
+  enabled: boolean;
+}
+
+export interface StrategyAsset extends StrategyAssetDraft {
+  id: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface PerformanceMetrics {
   initial_cash: number;
   final_equity: number;
@@ -66,6 +81,41 @@ export interface BacktestResult {
   equity_curve: EquityPoint[];
   trades: TradeRecord[];
   kline_data: Record<string, KlineBar[]>;
+}
+
+export type BacktestGridSortKey =
+  | 'total_return'
+  | 'annual_return'
+  | 'max_drawdown'
+  | 'sharpe_ratio'
+  | 'win_rate'
+  | 'final_equity';
+
+export interface BacktestGridRequest {
+  base: BacktestRequest;
+  parameters: Record<string, Array<number | string | boolean | null>>;
+  max_runs: number;
+  sort_by: BacktestGridSortKey;
+  sort_order: 'asc' | 'desc';
+}
+
+export interface BacktestGridItem {
+  status: 'completed' | 'failed';
+  strategy_params: Record<string, number | string | boolean | null>;
+  request: BacktestRequest;
+  metrics: PerformanceMetrics | null;
+  run_id: string | null;
+  error: string | null;
+}
+
+export interface BacktestGridResult {
+  requested: number;
+  completed: number;
+  failed: number;
+  sort_by: BacktestGridSortKey;
+  sort_order: 'asc' | 'desc';
+  best: BacktestGridItem | null;
+  results: BacktestGridItem[];
 }
 
 // ── Screening ──
@@ -156,6 +206,81 @@ export interface FactorDef {
   label: string;
   default_weight: number;
   desc: string;
+}
+
+export interface ManagedFactorDraft {
+  key: string;
+  label: string;
+  category: string;
+  description: string;
+  expression: string;
+  default_weight: number;
+  enabled: boolean;
+}
+
+export interface ManagedFactor extends ManagedFactorDraft {
+  id: string;
+  source: 'builtin' | 'custom';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FactorMiningRequest {
+  symbols?: string[] | null;
+  lookback: number;
+  forward_days: number;
+  min_samples: number;
+}
+
+export interface FactorMiningItem {
+  key: string;
+  label: string;
+  category: string;
+  samples: number;
+  ic: number | null;
+  abs_ic: number | null;
+  coverage: number;
+  direction: string;
+}
+
+export interface FactorMiningResult {
+  symbols: number;
+  lookback: number;
+  forward_days: number;
+  items: FactorMiningItem[];
+  warnings: string[];
+}
+
+export interface RiskRuleDraft {
+  name: string;
+  description: string;
+  max_position_pct: number;
+  max_drawdown: number;
+  max_single_order_pct: number;
+  stop_loss_pct: number;
+  take_profit_pct: number;
+  max_symbols: number;
+  enabled: boolean;
+}
+
+export interface RiskRule extends RiskRuleDraft {
+  id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RiskEvaluationCheck {
+  key: string;
+  label: string;
+  passed: boolean;
+  message: string;
+  severity: string;
+}
+
+export interface RiskEvaluationResult {
+  passed: boolean;
+  rule: RiskRuleDraft;
+  checks: RiskEvaluationCheck[];
 }
 
 // ── Agent ──

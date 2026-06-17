@@ -93,7 +93,7 @@ export default function TradesTable({ trades }: Props) {
     <Table
       dataSource={trades}
       columns={columns}
-      rowKey={(_r, i) => `${i}`}
+      rowKey={(r) => `${r.dt}-${r.symbol}-${r.side}-${r.qty}-${r.price}-${r.commission}`}
       size="small"
       pagination={{
         pageSize: 20,

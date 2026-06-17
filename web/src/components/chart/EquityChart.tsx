@@ -12,12 +12,14 @@ export default function EquityChart({ data, initialCash }: Props) {
     const dates = data.map((d) => d.dt);
     const returns = data.map((d) => +((d.equity / initialCash - 1) * 100).toFixed(4));
 
-    // Drawdown series
-    let peak = 0;
-    const drawdowns = data.map((d) => {
-      if (d.equity > peak) peak = d.equity;
-      return +((d.equity / peak - 1) * 100).toFixed(4);
-    });
+    const drawdowns = data.reduce<{ peak: number; values: number[] }>(
+      (acc, d) => {
+        const peak = Math.max(acc.peak, d.equity);
+        const drawdown = peak > 0 ? +((d.equity / peak - 1) * 100).toFixed(4) : 0;
+        return { peak, values: [...acc.values, drawdown] };
+      },
+      { peak: 0, values: [] },
+    ).values;
 
     return {
       backgroundColor: 'transparent',
