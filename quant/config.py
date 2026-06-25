@@ -148,12 +148,12 @@ def get_settings() -> Settings:
         config_file=config_file,
         app=AppSettings(
             backend_host=_text("QUANT_BACKEND_HOST", "0.0.0.0"),
-            backend_port=_integer("QUANT_BACKEND_PORT", 8000, 1),
+            backend_port=_integer("QUANT_BACKEND_PORT", 8001, 1),
             frontend_host=_text("QUANT_FRONTEND_HOST", "0.0.0.0"),
-            frontend_port=_integer("QUANT_FRONTEND_PORT", 5173, 1),
+            frontend_port=_integer("QUANT_FRONTEND_PORT", 5174, 1),
             cors_origins=_csv(
                 "QUANT_CORS_ORIGINS",
-                "http://localhost:5173,http://127.0.0.1:5173",
+                "http://localhost:5174,http://127.0.0.1:5174",
             ),
             reload=_boolean("QUANT_RELOAD"),
             memory_high=_text("QUANT_MEMORY_HIGH", "9G"),

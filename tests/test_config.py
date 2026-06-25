@@ -55,3 +55,17 @@ def test_settings_use_selected_config_file(tmp_path, monkeypatch):
     assert settings.data.memory_budget_gb == 8
     assert settings.app.cors_origins[-1] == "http://example.test"
     reset_settings()
+
+
+def test_settings_defaults_match_local_startup_ports(monkeypatch):
+    monkeypatch.setenv("QUANT_CONFIG_FILE", "__missing_quant_env__")
+    for key in ("QUANT_BACKEND_PORT", "QUANT_FRONTEND_PORT", "QUANT_CORS_ORIGINS"):
+        monkeypatch.delenv(key, raising=False)
+    reset_settings()
+
+    settings = get_settings()
+
+    assert settings.app.backend_port == 8001
+    assert settings.app.frontend_port == 5174
+    assert "http://127.0.0.1:5174" in settings.app.cors_origins
+    reset_settings()
