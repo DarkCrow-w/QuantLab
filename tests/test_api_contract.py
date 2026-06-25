@@ -204,38 +204,39 @@ def test_factor_management_and_mining_contract(monkeypatch):
     created = client.post("/api/factors", json=payload)
     assert created.status_code == 200
     factor = created.json()
-    assert factor["key"] == factor_key
+    try:
+        assert factor["key"] == factor_key
 
-    updated = client.put(f"/api/factors/{factor['id']}", json={**payload, "default_weight": 2.0})
-    assert updated.status_code == 200
-    assert updated.json()["default_weight"] == 2.0
+        updated = client.put(f"/api/factors/{factor['id']}", json={**payload, "default_weight": 2.0})
+        assert updated.status_code == 200
+        assert updated.json()["default_weight"] == 2.0
 
-    def fake_mine(req):
-        return FactorMiningResult(
-            lookback=req.lookback,
-            forward_days=req.forward_days,
-            symbols=3,
-            items=[
-                FactorMiningItem(
-                    key="momentum_20",
-                    label="20日动量",
-                    category="momentum",
-                    ic=0.1234,
-                    abs_ic=0.1234,
-                    samples=42,
-                    coverage=1.0,
-                    direction="positive",
-                )
-            ],
-        )
+        def fake_mine(req):
+            return FactorMiningResult(
+                lookback=req.lookback,
+                forward_days=req.forward_days,
+                symbols=3,
+                items=[
+                    FactorMiningItem(
+                        key="momentum_20",
+                        label="20日动量",
+                        category="momentum",
+                        ic=0.1234,
+                        abs_ic=0.1234,
+                        samples=42,
+                        coverage=1.0,
+                        direction="positive",
+                    )
+                ],
+            )
 
-    monkeypatch.setattr(factor_router, "mine_factors", fake_mine)
-    mined = client.post("/api/factors/mine", json={"lookback": 120, "forward_days": 5, "min_samples": 10})
-    assert mined.status_code == 200
-    assert mined.json()["items"][0]["key"] == "momentum_20"
-
-    deleted = client.delete(f"/api/factors/{factor['id']}")
-    assert deleted.status_code == 200
+        monkeypatch.setattr(factor_router, "mine_factors", fake_mine)
+        mined = client.post("/api/factors/mine", json={"lookback": 120, "forward_days": 5, "min_samples": 10})
+        assert mined.status_code == 200
+        assert mined.json()["items"][0]["key"] == "momentum_20"
+    finally:
+        deleted = client.delete(f"/api/factors/{factor['id']}")
+        assert deleted.status_code == 200
 
 
 def test_risk_rule_crud_and_evaluation_contract():
@@ -255,27 +256,28 @@ def test_risk_rule_crud_and_evaluation_contract():
     created = client.post("/api/risk/rules", json=payload)
     assert created.status_code == 200
     rule = created.json()
-    assert rule["name"] == payload["name"]
+    try:
+        assert rule["name"] == payload["name"]
 
-    updated = client.put(f"/api/risk/rules/{rule['id']}", json={**payload, "max_symbols": 5})
-    assert updated.status_code == 200
-    assert updated.json()["max_symbols"] == 5
+        updated = client.put(f"/api/risk/rules/{rule['id']}", json={**payload, "max_symbols": 5})
+        assert updated.status_code == 200
+        assert updated.json()["max_symbols"] == 5
 
-    evaluated = client.post(
-        "/api/risk/evaluate",
-        json={
-            "rule_id": rule["id"],
-            "equity": 1000000,
-            "position_value": 400000,
-            "order_value": 50000,
-            "drawdown": 0.1,
-            "symbol_count": 3,
-        },
-    )
-    assert evaluated.status_code == 200
-    body = evaluated.json()
-    assert body["rule"]["name"] == payload["name"]
-    assert any(check["key"] == "position" for check in body["checks"])
-
-    deleted = client.delete(f"/api/risk/rules/{rule['id']}")
-    assert deleted.status_code == 200
+        evaluated = client.post(
+            "/api/risk/evaluate",
+            json={
+                "rule_id": rule["id"],
+                "equity": 1000000,
+                "position_value": 400000,
+                "order_value": 50000,
+                "drawdown": 0.1,
+                "symbol_count": 3,
+            },
+        )
+        assert evaluated.status_code == 200
+        body = evaluated.json()
+        assert body["rule"]["name"] == payload["name"]
+        assert any(check["key"] == "position" for check in body["checks"])
+    finally:
+        deleted = client.delete(f"/api/risk/rules/{rule['id']}")
+        assert deleted.status_code == 200

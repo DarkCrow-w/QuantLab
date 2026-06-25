@@ -106,8 +106,10 @@ class RiskRuleStore:
 
     def _seed_default(self) -> None:
         with self._connect() as conn:
-            count = conn.execute("SELECT COUNT(*) FROM risk_rules").fetchone()[0]
-        if count:
+            exists = conn.execute(
+                "SELECT 1 FROM risk_rules WHERE id = ?", ("default_basic",)
+            ).fetchone()
+        if exists:
             return
         self.save(
             RiskRuleDraft(
