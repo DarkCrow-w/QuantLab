@@ -93,6 +93,11 @@ textarea {
   border-bottom: 1px solid var(--border-light);
 }
 
+.ant-message {
+  top: calc(var(--header-height) + 8px) !important;
+  pointer-events: none;
+}
+
 .topbar-left,
 .topbar-actions,
 .primary-nav,
