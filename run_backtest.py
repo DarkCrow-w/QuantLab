@@ -24,11 +24,9 @@ from quant.data.tushare_feed import TuShareFeed
 from quant.engine.backtest import BacktestEngine
 from quant.execution.simulated import SimulatedBroker
 from quant.risk.basic import BasicRiskManager
-from quant.strategy.examples.ma_cross import MACrossStrategy
+from quant.strategy.registry import BASIC_STRATEGY_CLASSES, get_basic_strategy_class
 
-STRATEGY_MAP = {
-    "ma_cross": MACrossStrategy,
-}
+STRATEGY_MAP = BASIC_STRATEGY_CLASSES
 
 
 def parse_args():
@@ -37,7 +35,7 @@ def parse_args():
     p.add_argument("-s", "--symbols", nargs="+", default=["600519"], help="股票代码 (默认: 600519)")
     p.add_argument("--start", default="2023-01-01", help="开始日期 (默认: 2023-01-01)")
     p.add_argument("--end", default="2024-12-31", help="结束日期 (默认: 2024-12-31)")
-    p.add_argument("--strategy", default="ma_cross", help="策略名 (默认: ma_cross)")
+    p.add_argument("--strategy", default="ma_cross", choices=sorted(STRATEGY_MAP), help="策略名")
     p.add_argument("--fast", type=int, default=5, help="快线周期 (默认: 5)")
     p.add_argument("--slow", type=int, default=20, help="慢线周期 (默认: 20)")
     p.add_argument("--cash", type=float, default=1_000_000, help="初始资金 (默认: 100万)")
@@ -105,9 +103,7 @@ def main() -> None:
     feed = build_feed(cfg)
 
     strat_name = cfg["strategy"]["name"]
-    strat_cls = STRATEGY_MAP.get(strat_name)
-    if strat_cls is None:
-        raise ValueError(f"Unknown strategy: {strat_name}")
+    strat_cls = get_basic_strategy_class(strat_name)
     strategy = strat_cls(params=cfg["strategy"].get("params", {}))
 
     risk_cfg = cfg.get("risk", {})

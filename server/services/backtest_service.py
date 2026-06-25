@@ -14,10 +14,7 @@ from quant.data.tushare_feed import TuShareFeed
 from quant.engine.backtest import BacktestEngine
 from quant.execution.simulated import SimulatedBroker
 from quant.risk.basic import BasicRiskManager
-from quant.strategy.examples.dip_buy import DipBuyStrategy
-from quant.strategy.examples.ma_cross import MACrossStrategy
-from quant.strategy.examples.vol_kdj_bbi import VolKDJBBIStrategy
-from quant.strategy.examples.bbi_kdj_trend import BBIKDJTrendStrategy
+from quant.strategy.registry import BASIC_STRATEGY_CLASSES
 from server.services.composite_backtest_strategy import CompositeRuleStrategy
 from server.services.factor_strategy_service import FactorStrategyStore
 
@@ -36,7 +33,7 @@ from server.models.market import ParamSchema, StrategyInfo
 
 STRATEGY_REGISTRY: dict[str, dict] = {
     "ma_cross": {
-        "cls": MACrossStrategy,
+        "cls": BASIC_STRATEGY_CLASSES["ma_cross"],
         "display_name": "MA 均线交叉",
         "params_schema": [
             ParamSchema(name="fast_period", type="int", default=5, min=2, max=60, label="快线周期"),
@@ -44,7 +41,7 @@ STRATEGY_REGISTRY: dict[str, dict] = {
         ],
     },
     "vol_kdj_bbi": {
-        "cls": VolKDJBBIStrategy,
+        "cls": BASIC_STRATEGY_CLASSES["vol_kdj_bbi"],
         "display_name": "量价KDJ+BBI",
         "params_schema": [
             ParamSchema(name="kdj_period", type="int", default=9, min=5, max=21, label="KDJ周期"),
@@ -57,7 +54,7 @@ STRATEGY_REGISTRY: dict[str, dict] = {
         ],
     },
     "bbi_kdj_trend": {
-        "cls": BBIKDJTrendStrategy,
+        "cls": BASIC_STRATEGY_CLASSES["bbi_kdj_trend"],
         "display_name": "BBI趋势+KDJ择时",
         "params_schema": [
             ParamSchema(name="kdj_period", type="int", default=9, min=5, max=21, label="KDJ周期"),
@@ -71,7 +68,7 @@ STRATEGY_REGISTRY: dict[str, dict] = {
         ],
     },
     "dip_buy": {
-        "cls": DipBuyStrategy,
+        "cls": BASIC_STRATEGY_CLASSES["dip_buy"],
         "display_name": "抄底（RSI+KDJ+VOL+BBI）",
         "params_schema": [
             ParamSchema(name="ma_period", type="int", default=20, min=10, max=60, label="均线/N型周期"),

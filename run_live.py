@@ -12,11 +12,9 @@ from quant.data.akshare_feed import AKShareFeed
 from quant.engine.live import LiveEngine
 from quant.execution.futu import FutuBroker
 from quant.risk.basic import BasicRiskManager
-from quant.strategy.examples.ma_cross import MACrossStrategy
+from quant.strategy.registry import BASIC_STRATEGY_CLASSES, get_basic_strategy_class
 
-STRATEGY_MAP = {
-    "ma_cross": MACrossStrategy,
-}
+STRATEGY_MAP = BASIC_STRATEGY_CLASSES
 
 
 def main() -> None:
@@ -36,7 +34,7 @@ def main() -> None:
     feed.subscribe(cfg["data"]["symbols"])
 
     strat_name = cfg["strategy"]["name"]
-    strategy = STRATEGY_MAP[strat_name](params=cfg["strategy"].get("params", {}))
+    strategy = get_basic_strategy_class(strat_name)(params=cfg["strategy"].get("params", {}))
 
     risk_cfg = cfg.get("risk", {})
     risk_manager = BasicRiskManager(

@@ -151,7 +151,7 @@ flowchart LR
 
 1. 交互简单，适合本地快速调参。
 2. 直接显示权益曲线、K 线图、交易记录。
-3. 当前只挂了均线交叉策略，属于最轻量的研究入口。
+3. 策略列表来自共享基础策略注册表，与命令行和后端保持一致。
 
 ### `run_backtest.py`
 
@@ -160,6 +160,7 @@ flowchart LR
 1. 直接用命令行参数跑回测。
 2. 通过 YAML 配置文件运行。
 3. 自动生成交易记录和 HTML 报告。
+4. `--strategy` 支持 `ma_cross`、`vol_kdj_bbi`、`bbi_kdj_trend`、`dip_buy`。
 
 它会按顺序完成：数据源构建 -> 策略实例化 -> 风控初始化 -> 模拟经纪商初始化 -> 回测执行 -> 结果导出。
 
@@ -486,6 +487,7 @@ python app.py
 ```bash
 python run_backtest.py
 python run_backtest.py -s 600519 000858
+python run_backtest.py --strategy dip_buy -s 600000 --no-report
 python run_backtest.py -c configs/backtest_ma_cross.yaml
 ```
 

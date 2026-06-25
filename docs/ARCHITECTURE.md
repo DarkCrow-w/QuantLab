@@ -313,7 +313,7 @@ python run_backtest.py
   -> results/report.html
 ```
 
-目前 `run_backtest.py` 的策略映射只包含 `ma_cross`，比后端策略注册表少。
+`run_backtest.py` 和 `run_live.py` 使用 `quant.strategy.registry.BASIC_STRATEGY_CLASSES`，基础策略类映射与后端保持一致。
 
 ### 7.3 多因子选股链路
 
@@ -380,9 +380,9 @@ python run_live.py configs/live_ma_cross.yaml
 
 1. 在 `quant/strategy/examples/` 或新的策略目录实现 `Strategy` 子类。
 2. 实现 `on_bar(ctx) -> list[SignalEvent]`。
-3. 在 `server/services/backtest_service.py` 的 `STRATEGY_REGISTRY` 注册策略和参数 schema。
-4. 如果需要命令行支持，同步更新 `run_backtest.py` 的 `STRATEGY_MAP`。
-5. 如果需要实盘支持，同步更新 `run_live.py` 的 `STRATEGY_MAP` 和配置文件。
+3. 在 `quant/strategy/registry.py` 注册策略类和展示名。
+4. 在 `server/services/backtest_service.py` 的 `STRATEGY_REGISTRY` 注册后端参数 schema。
+5. 如果需要实盘默认配置，新增或更新 `configs/live_*.yaml`。
 
 ### 8.2 新增指标
 
@@ -463,10 +463,9 @@ pnpm lint
 1. 外层 `quantlab` 不是 Git 仓库，`quant/` 自己是 Git 仓库；在 Windows/WSL UNC 路径下执行 `git status` 可能触发 safe.directory 限制。
 2. Agent 后端已挂载；模型 Key 未配置时仅 Agent 对话不可用，其他模块可继续使用。
 3. 回测服务仍走旧 feed，选股与行情主要走 DataStore，数据路径尚未完全统一。
-4. `run_backtest.py` 与 `run_live.py` 的策略映射比后端少。
-5. 部分源码注释或中文标签在当前终端读取时可能出现乱码，修改中文文案前应先确认文件真实编码。
-6. `screening_service.py` 会吞掉单票异常，这保证批量扫描不中断，但调试时可能需要临时加日志。
-7. `update_universe(force=True)` 会触发更重的数据刷新；增量更新和复权漂移需要结合数据源行为谨慎处理。
+4. 部分源码注释或中文标签在当前终端读取时可能出现乱码，修改中文文案前应先确认文件真实编码。
+5. `screening_service.py` 会吞掉单票异常，这保证批量扫描不中断，但调试时可能需要临时加日志。
+6. `update_universe(force=True)` 会触发更重的数据刷新；增量更新和复权漂移需要结合数据源行为谨慎处理。
 
 ## 11. 后续协作默认认知
 

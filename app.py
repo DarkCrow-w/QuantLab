@@ -11,10 +11,11 @@ from quant.data.akshare_feed import AKShareFeed
 from quant.engine.backtest import BacktestEngine
 from quant.execution.simulated import SimulatedBroker
 from quant.risk.basic import BasicRiskManager
-from quant.strategy.examples.ma_cross import MACrossStrategy
+from quant.strategy.registry import BASIC_STRATEGY_CLASSES, STRATEGY_DISPLAY_NAMES
 
 STRATEGY_MAP = {
-    "MA 均线交叉": MACrossStrategy,
+    STRATEGY_DISPLAY_NAMES[name]: cls
+    for name, cls in BASIC_STRATEGY_CLASSES.items()
 }
 
 st.set_page_config(page_title="量化回测", layout="wide", page_icon="📈")
