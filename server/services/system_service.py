@@ -7,6 +7,7 @@ from typing import Literal
 
 from quant.config import get_settings
 from quant.data import INDICATORS, get_store
+from quant.data.symbol_filter import filter_a_share_rows
 from quant.data.updater import list_cached_symbols
 from server.agent.model import get_agent_runtime_status
 from server.services.backtest_service import get_strategy_list
@@ -144,10 +145,11 @@ def _data_cache_check() -> SystemCheck:
 
 def _universe_check(store) -> SystemCheck:
     universe = store.get_universe()
-    count = 0 if universe.empty else len(universe)
+    rows = [] if universe.empty else filter_a_share_rows(universe.to_dict(orient="records"))
+    count = len(rows)
     markets = []
-    if not universe.empty and "market" in universe.columns:
-        markets = sorted(str(value) for value in universe["market"].dropna().unique())
+    if rows:
+        markets = sorted({str(row.get("market")) for row in rows if row.get("market")})
     return SystemCheck(
         key="universe",
         label="股票池",
