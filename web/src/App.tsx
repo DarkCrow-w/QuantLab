@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState } from 'react';
-import { ConfigProvider, theme } from 'antd';
+import { App as AntdApp, ConfigProvider, theme } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import AppLayout from './components/layout/AppLayout';
 import Sidebar from './components/layout/Sidebar';
@@ -63,35 +63,37 @@ export default function App() {
         },
       }}
     >
-      <AppLayout
-        activePage={activePage}
-        onPageChange={setActivePage}
-        sidebar={sidebar}
-      >
-        <Suspense fallback={<Loading label="模块加载中..." />}>
-          {activePage === 'dashboard' ? (
-            <DashboardPage onPageChange={setActivePage} />
-          ) : activePage === 'data' ? (
-            <DataPage />
-          ) : activePage === 'trading' ? (
-            <TradingPage />
-          ) : activePage === 'research' ? (
-            <ResearchPage />
-          ) : activePage === 'strategy' ? (
-            <StrategyPage />
-          ) : activePage === 'factors' ? (
-            <FactorPage />
-          ) : activePage === 'risk' ? (
-            <RiskPage />
-          ) : activePage === 'backtest' ? (
-            <BacktestPage />
-          ) : activePage === 'screening' ? (
-            <ScreeningPage />
-          ) : (
-            <AgentPage />
-          )}
-        </Suspense>
-      </AppLayout>
+      <AntdApp>
+        <AppLayout
+          activePage={activePage}
+          onPageChange={setActivePage}
+          sidebar={sidebar}
+        >
+          <Suspense fallback={<Loading label="模块加载中..." />}>
+            {activePage === 'dashboard' ? (
+              <DashboardPage onPageChange={setActivePage} />
+            ) : activePage === 'data' ? (
+              <DataPage />
+            ) : activePage === 'trading' ? (
+              <TradingPage />
+            ) : activePage === 'research' ? (
+              <ResearchPage />
+            ) : activePage === 'strategy' ? (
+              <StrategyPage />
+            ) : activePage === 'factors' ? (
+              <FactorPage />
+            ) : activePage === 'risk' ? (
+              <RiskPage />
+            ) : activePage === 'backtest' ? (
+              <BacktestPage />
+            ) : activePage === 'screening' ? (
+              <ScreeningPage />
+            ) : (
+              <AgentPage />
+            )}
+          </Suspense>
+        </AppLayout>
+      </AntdApp>
     </ConfigProvider>
   );
 }

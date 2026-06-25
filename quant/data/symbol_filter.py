@@ -5,6 +5,7 @@ from __future__ import annotations
 _SH_A_PREFIXES = ("600", "601", "603", "605", "688", "689")
 _SZ_A_PREFIXES = ("000", "001", "002", "003", "300", "301")
 _BJ_A_PREFIXES = ("430", "830", "831", "832", "833", "834", "835", "836", "837", "838", "839", "870", "871", "872", "873", "920")
+_DELISTED_NAME_MARKERS = ("退市", "终止上市", "摘牌", "delist")
 
 
 def is_a_share_symbol(symbol: object, include_bj: bool = True) -> bool:
@@ -25,6 +26,19 @@ def is_a_share_symbol(symbol: object, include_bj: bool = True) -> bool:
     return code.startswith(prefixes)
 
 
+def is_active_a_share_row(row: dict, include_bj: bool = True) -> bool:
+    """Return True for active ordinary A-share rows.
+
+    Providers can keep recently delisted securities in their security lists.
+    Those codes still look like ordinary stocks, so name-based filtering is
+    needed in addition to prefix filtering.
+    """
+    if not is_a_share_symbol(row.get("symbol"), include_bj=include_bj):
+        return False
+    name = str(row.get("name") or "").strip().lower()
+    return not any(marker in name for marker in _DELISTED_NAME_MARKERS)
+
+
 def filter_a_share_rows(rows: list[dict], include_bj: bool = True) -> list[dict]:
     """Deduplicate and filter provider symbol records to tradable A-share rows."""
     seen: set[str] = set()
@@ -35,10 +49,11 @@ def filter_a_share_rows(rows: list[dict], include_bj: bool = True) -> list[dict]
             left, right = code.split(".", 1)
             code = left if left.isdigit() else right
         code = code.zfill(6)
-        if not is_a_share_symbol(code, include_bj=include_bj) or code in seen:
+        candidate = dict(row)
+        candidate["symbol"] = code
+        if not is_active_a_share_row(candidate, include_bj=include_bj) or code in seen:
             continue
-        next_row = dict(row)
-        next_row["symbol"] = code
+        next_row = candidate
         if not next_row.get("market"):
             if code.startswith(("4", "8", "920")):
                 next_row["market"] = "BJ"

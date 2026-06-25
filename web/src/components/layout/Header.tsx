@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  App as AntdApp,
   Button,
   Input,
   Layout,
-  message,
   Modal,
   Progress,
   Segmented,
@@ -83,6 +83,7 @@ export default function Header({
   hasSidebar,
   onOpenSidebar,
 }: HeaderProps) {
+  const { message, modal } = AntdApp.useApp();
   const [open, setOpen] = useState(false);
   const [cache, setCache] = useState<CacheInfo[]>([]);
   const [loading, setLoading] = useState(false);
@@ -121,7 +122,7 @@ export default function Header({
     } catch {
       stopPolling();
     }
-  }, [refreshCache, stopPolling]);
+  }, [message, refreshCache, stopPolling]);
 
   const startPolling = useCallback(() => {
     stopPolling();
@@ -193,7 +194,7 @@ export default function Header({
 
   const cancelJob = () => {
     if (!job?.id) return;
-    Modal.confirm({
+    modal.confirm({
       title: '取消当前数据任务？',
       content: '已经下载并写入的数据会保留，尚未处理的股票将停止下载。',
       okText: '取消任务',

@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  App as AntdApp,
   Button,
   Input,
-  message,
-  Modal,
   Progress,
   Segmented,
   Space,
@@ -65,6 +64,7 @@ function StatTile({ label, value, sub }: { label: string; value: React.ReactNode
 }
 
 export default function DataPage() {
+  const { message, modal } = AntdApp.useApp();
   const [cache, setCache] = useState<CacheInfo[]>([]);
   const [cacheStatus, setCacheStatus] = useState<CacheStatusInfo[]>([]);
   const [indicators, setIndicators] = useState<IndicatorInfo[]>([]);
@@ -115,7 +115,7 @@ export default function DataPage() {
     } catch {
       stopPolling();
     }
-  }, [refreshCatalog, stopPolling]);
+  }, [message, refreshCatalog, stopPolling]);
 
   const startPolling = useCallback(() => {
     stopPolling();
@@ -194,7 +194,7 @@ export default function DataPage() {
 
   const cancelJob = () => {
     if (!job?.id) return;
-    Modal.confirm({
+    modal.confirm({
       title: '取消当前数据任务？',
       content: '已写入的数据会保留，未处理的标的将停止下载。',
       okText: '取消任务',

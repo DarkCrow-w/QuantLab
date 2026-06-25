@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Drawer, Form, Input, InputNumber, Space, Switch, Table, Tag, message } from 'antd';
+import { App as AntdApp, Button, Drawer, Form, Input, InputNumber, Space, Switch, Table, Tag } from 'antd';
 import { DeleteOutlined, EditOutlined, PlusOutlined, SafetyCertificateOutlined, SaveOutlined } from '@ant-design/icons';
 import {
   createRiskRule,
@@ -23,6 +23,7 @@ const emptyRule: RiskRuleDraft = {
 };
 
 export default function RiskPage() {
+  const { message } = AntdApp.useApp();
   const [rules, setRules] = useState<RiskRule[]>([]);
   const [editing, setEditing] = useState<RiskRule | null>(null);
   const [draft, setDraft] = useState<RiskRuleDraft>(emptyRule);
@@ -130,7 +131,7 @@ export default function RiskPage() {
         </div>
       </div>
 
-      <Drawer title={editing ? '编辑风控规则' : '新建风控规则'} open={open} width={520} onClose={() => setOpen(false)}>
+      <Drawer title={editing ? '编辑风控规则' : '新建风控规则'} open={open} size="large" onClose={() => setOpen(false)}>
         <Form layout="vertical">
           <Form.Item label="名称"><Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></Form.Item>
           <Form.Item label="说明"><Input.TextArea rows={3} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></Form.Item>

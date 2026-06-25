@@ -4,6 +4,7 @@ from datetime import date
 
 from quant.data import INDICATORS, get_store
 from quant.data.schema import Freq, OHLCV_COLUMNS
+from quant.data.symbol_filter import filter_a_share_rows
 from server.models.backtest import KlineBar
 
 
@@ -69,7 +70,7 @@ def get_universe(market: str | None = None) -> list[dict]:
     df = get_store().get_universe(market=market)
     if df.empty:
         return []
-    return df.to_dict(orient="records")
+    return filter_a_share_rows(df.to_dict(orient="records"))
 
 
 def get_calendar(start: str | None = None, end: str | None = None) -> list[dict]:

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Drawer, Form, Input, InputNumber, Select, Space, Switch, Table, Tag, message } from 'antd';
+import { App as AntdApp, Button, Drawer, Form, Input, InputNumber, Select, Space, Switch, Table, Tag } from 'antd';
 import { DeleteOutlined, EditOutlined, PlusOutlined, SaveOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import {
   createManagedFactor,
@@ -21,6 +21,7 @@ const emptyFactor: ManagedFactorDraft = {
 };
 
 export default function FactorPage() {
+  const { message } = AntdApp.useApp();
   const [factors, setFactors] = useState<ManagedFactor[]>([]);
   const [editing, setEditing] = useState<ManagedFactor | null>(null);
   const [draft, setDraft] = useState<ManagedFactorDraft>(emptyFactor);
@@ -149,7 +150,7 @@ export default function FactorPage() {
         </div>
       </div>
 
-      <Drawer title={editing ? '编辑因子' : '自定义因子'} open={open} width={520} onClose={() => setOpen(false)}>
+      <Drawer title={editing ? '编辑因子' : '自定义因子'} open={open} size="large" onClose={() => setOpen(false)}>
         <Form layout="vertical">
           <Form.Item label="Key"><Input value={draft.key} onChange={(e) => setDraft({ ...draft, key: e.target.value })} /></Form.Item>
           <Form.Item label="名称"><Input value={draft.label} onChange={(e) => setDraft({ ...draft, label: e.target.value })} /></Form.Item>
