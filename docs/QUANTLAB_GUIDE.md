@@ -270,6 +270,7 @@ clone 后建议执行：
 .\.venv\Scripts\python.exe scripts\verify_frontend_api_contract.py
 .\.venv\Scripts\python.exe scripts\verify_frontend_text_smoke.py
 .\.venv\Scripts\python.exe scripts\verify_frontend_ui_inventory.py
+.\.venv\Scripts\python.exe scripts\verify_launch_scripts.py
 .\.venv\Scripts\python.exe scripts\verify_production_frontend_smoke.py
 .\.venv\Scripts\python.exe scripts\verify_runtime_smoke.py
 .\.venv\Scripts\python.exe scripts\verify_fresh_clone_smoke.py

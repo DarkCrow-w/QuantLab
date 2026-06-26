@@ -318,7 +318,7 @@ cmd_start() {
     copy_default_config
     load_config_file
     info "Starting Quant..."
-    seed_demo_data || return 1
+    cmd_setup || return 1
     local failed=0
     start_backend || failed=1
     start_frontend || failed=1

@@ -50,6 +50,7 @@ python scripts/verify_data_integrity.py
 python scripts/verify_deployment_config.py
 python scripts/verify_frontend_api_contract.py
 python scripts/verify_frontend_ui_inventory.py
+python scripts/verify_launch_scripts.py
 python scripts/verify_production_frontend_smoke.py
 python scripts/verify_runtime_smoke.py
 python scripts/verify_fresh_clone_smoke.py
@@ -64,6 +65,8 @@ python scripts/verify_fresh_clone_smoke.py
 `verify_frontend_api_contract.py` 会解析前端 API client，与后端 OpenAPI 和 WebSocket 路由表比对，避免 UI 按钮调用不存在的接口。
 
 `verify_frontend_ui_inventory.py` 会检查主导航、核心页面标题和关键操作文案，避免页面入口或管理功能在迭代中被误删。
+
+`verify_launch_scripts.py` 会检查 Windows/macOS/Linux 启停脚本的语法、依赖初始化顺序和健康检查等待逻辑。
 
 `verify_production_frontend_smoke.py` 会启动后端和生产前端预览，检查 `/api` 代理、HTML 入口和生产 bundle 启动风险。
 
