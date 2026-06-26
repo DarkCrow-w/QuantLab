@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { BacktestResult, StrategyInfo } from '../types';
-import { fetchFactorStrategies, runBacktest } from '../api/client';
+import { fetchFactorStrategies, fetchStrategyList, runBacktest } from '../api/client';
 
 interface BacktestStore {
   // Strategy list
@@ -30,15 +30,24 @@ interface BacktestStore {
 export const useBacktestStore = create<BacktestStore>((set, get) => ({
   strategies: [],
   loadStrategies: async () => {
-    const factorStrategies = await fetchFactorStrategies();
-    const strategies: StrategyInfo[] = factorStrategies.map((strategy) => ({
+    const [basicStrategies, factorStrategies] = await Promise.all([
+      fetchStrategyList(),
+      fetchFactorStrategies(),
+    ]);
+    const compositeStrategies: StrategyInfo[] = factorStrategies.map((strategy) => ({
       name: `composite:${strategy.id}`,
-      display_name: strategy.name,
+      display_name: `组合 · ${strategy.name}`,
       params_schema: [],
     }));
+    const basicStrategyOptions = basicStrategies.map((strategy) => ({
+      ...strategy,
+      display_name: `基础 · ${strategy.display_name}`,
+    }));
+    const strategies = [...compositeStrategies, ...basicStrategyOptions];
+    const current = get().strategy;
     set({ strategies });
-    if (strategies.length > 0) {
-      const first = strategies[0];
+    if (strategies.length > 0 && !strategies.some((item) => item.name === current)) {
+      const first = strategies.find((item) => item.name === 'composite:builtin_ma_cross') ?? strategies[0];
       set({ strategy: first.name, strategyParams: {} });
     }
   },

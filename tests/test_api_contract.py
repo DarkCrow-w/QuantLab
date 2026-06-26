@@ -235,6 +235,93 @@ def test_strategy_list_and_composer_strategy_contract():
         assert deleted.json() == {"status": "deleted"}
 
 
+def test_backtest_run_contract_saves_research_asset(monkeypatch):
+    from server.models.backtest import (
+        BacktestResult,
+        EquityPoint,
+        KlineBar,
+        PerformanceMetrics,
+        TradeRecord,
+    )
+    from server.routers import backtest as backtest_router
+
+    saved_requests = []
+
+    def fake_run(req):
+        return BacktestResult(
+            metrics=PerformanceMetrics(
+                initial_cash=req.initial_cash,
+                final_equity=req.initial_cash * 1.01,
+                total_return=0.01,
+                annual_return=0.02,
+                max_drawdown=-0.01,
+                trade_count=1,
+                total_commission=5,
+                win_rate=1,
+                sharpe_ratio=1.2,
+                profit_loss_ratio=2,
+            ),
+            equity_curve=[
+                EquityPoint(dt="2024-01-02", equity=req.initial_cash),
+                EquityPoint(dt="2024-01-03", equity=req.initial_cash * 1.01),
+            ],
+            trades=[
+                TradeRecord(
+                    dt="2024-01-03",
+                    symbol=req.symbols[0],
+                    side="BUY",
+                    qty=100,
+                    price=10,
+                    commission=5,
+                )
+            ],
+            kline_data={
+                req.symbols[0]: [
+                    KlineBar(
+                        dt="2024-01-02",
+                        open=10,
+                        high=11,
+                        low=9,
+                        close=10.5,
+                        volume=100000,
+                    )
+                ]
+            },
+        )
+
+    class FakeResearchStore:
+        def save_backtest(self, req, result):
+            saved_requests.append((req, result))
+            return {"id": "run-1"}
+
+    monkeypatch.setattr(backtest_router, "run_backtest", fake_run)
+    monkeypatch.setattr(backtest_router, "get_research_store", lambda: FakeResearchStore())
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/backtest/run",
+        json={
+            "symbols": ["600000"],
+            "start_date": "2024-01-01",
+            "end_date": "2024-12-31",
+            "strategy": "composite:builtin_ma_cross",
+            "strategy_params": {},
+            "initial_cash": 1000000,
+            "max_position_pct": 0.3,
+            "max_drawdown": 0.2,
+            "commission_rate": 0.00025,
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["metrics"]["final_equity"] == 1010000
+    assert body["kline_data"]["600000"][0]["close"] == 10.5
+    assert body["trades"][0]["side"] == "BUY"
+    assert len(saved_requests) == 1
+    assert saved_requests[0][0].strategy == "composite:builtin_ma_cross"
+
+
 def test_backtest_grid_contract_returns_ranked_experiment_items(monkeypatch):
     from server.routers import backtest as backtest_router
 
