@@ -48,6 +48,7 @@ cp config/quant.prod.env.example config/quant.env
 python scripts/verify_clone_start.py
 python scripts/verify_config_contract.py
 python scripts/verify_data_integrity.py
+python scripts/verify_strategy_consistency.py
 python scripts/verify_deployment_config.py
 python scripts/verify_frontend_api_contract.py
 python scripts/verify_frontend_ui_inventory.py
@@ -65,6 +66,8 @@ python scripts/verify_windows_launch_smoke.py
 `verify_config_contract.py` 会检查本地/生产配置模板键集合、端口、CORS 和启停脚本默认端口是否一致。
 
 `verify_data_integrity.py` 会直接读取本地行情数据，检查股票池规模、缓存数量、OHLCV 合法性、指标列完整性和 catalog 一致性。
+
+`verify_strategy_consistency.py` 会检查基础策略、策略管理库内置组合策略、回测页策略来源和组合策略回测路径是否一致。
 
 `verify_frontend_api_contract.py` 会解析前端 API client，与后端 OpenAPI 和 WebSocket 路由表比对，避免 UI 按钮调用不存在的接口。
 
