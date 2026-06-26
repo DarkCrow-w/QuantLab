@@ -3,8 +3,17 @@ from __future__ import annotations
 import subprocess
 import sys
 
+from quant.data.symbol_filter import filter_a_share_rows
 from quant.data.store import DataStore
-from scripts.seed_demo_data import seed_demo_data
+from scripts.seed_demo_data import build_universe, seed_demo_data
+
+
+def test_demo_universe_survives_a_share_filter():
+    universe = build_universe(5000)
+    filtered = filter_a_share_rows(universe.to_dict(orient="records"))
+
+    assert len(universe) == 5000
+    assert len(filtered) == 5000
 
 
 def test_seed_demo_data_creates_offline_universe_and_cache(tmp_path):

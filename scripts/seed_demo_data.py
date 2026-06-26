@@ -115,14 +115,26 @@ def build_universe(min_universe: int) -> pd.DataFrame:
     for symbol in DEMO_SYMBOLS:
         add(symbol, demo_names.get(symbol, f"演示股票{symbol}"), "SH")
 
-    for code in range(600000, 600000 + min_universe * 2):
+    ranges = [
+        ("SH", 600000, 600999),
+        ("SH", 601000, 601999),
+        ("SH", 603000, 603999),
+        ("SH", 605000, 605999),
+        ("SZ", 1, 999),
+        ("SZ", 2000, 2999),
+        ("SZ", 300000, 300999),
+        ("SZ", 301000, 301999),
+        ("BJ", 830000, 830999),
+        ("BJ", 831000, 831999),
+    ]
+    for market, start, end in ranges:
+        for code in range(start, end + 1):
+            if len(rows) >= min_universe:
+                break
+            symbol = f"{code:06d}"
+            add(symbol, f"演示股票{symbol}", market)
         if len(rows) >= min_universe:
             break
-        add(f"{code:06d}", f"演示股票{code:06d}", "SH")
-    for code in range(1, min_universe * 2):
-        if len(rows) >= min_universe:
-            break
-        add(f"{code:06d}", f"演示股票{code:06d}", "SZ")
 
     return pd.DataFrame(rows[:min_universe])
 
