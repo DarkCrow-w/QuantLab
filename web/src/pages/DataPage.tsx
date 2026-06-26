@@ -101,10 +101,11 @@ export default function DataPage() {
   const pollJob = useCallback(async () => {
     try {
       const next = await getCurrentDataJob();
-      setJob(next);
       if (next.id && next.running) {
         observedJobIdsRef.current.add(next.id);
       }
+      const observed = Boolean(next.id && observedJobIdsRef.current.has(next.id));
+      setJob(next.running || observed ? next : null);
       if (!next.running && next.id && lastCompletedJobRef.current !== next.id) {
         lastCompletedJobRef.current = next.id;
         if (next.status === 'completed') {

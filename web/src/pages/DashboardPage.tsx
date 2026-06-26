@@ -96,7 +96,7 @@ export default function DashboardPage({ onPageChange }: Props) {
         setHealth(nextHealth);
         setAgent(nextAgent);
         setSystem(nextSystem);
-        setJob(nextJob);
+        setJob(nextJob.running ? nextJob : null);
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : '系统状态读取失败');
