@@ -41,6 +41,7 @@ def main() -> None:
     run_step("configuration contract", [sys.executable, "scripts/verify_config_contract.py"])
     run_step("offline demo data seed", [sys.executable, "scripts/seed_demo_data.py"])
     run_step("market data integrity", [sys.executable, "scripts/verify_data_integrity.py", "--skip-demo-seed"])
+    run_step("strategy library consistency", [sys.executable, "scripts/verify_strategy_consistency.py"])
     run_step("launch scripts", [sys.executable, "scripts/verify_launch_scripts.py"])
     run_step("Windows launch smoke", [sys.executable, "scripts/verify_windows_launch_smoke.py"])
     run_step("backend tests", [sys.executable, "-m", "pytest", "-q"])
