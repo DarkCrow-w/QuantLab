@@ -27,7 +27,7 @@ except Exception as e:
 APP_NAME = "QuantLab API"
 APP_VERSION = "0.1.0"
 
-app = FastAPI(title="量化回测平台 API", version=APP_VERSION)
+app = FastAPI(title="QuantLab 量化研究平台 API", version=APP_VERSION)
 settings = get_settings()
 
 app.add_middleware(
