@@ -38,6 +38,7 @@ def main() -> None:
             "import server.main; print(server.main.health())",
         ],
     )
+    run_step("configuration contract", [sys.executable, "scripts/verify_config_contract.py"])
     run_step("offline demo data seed", [sys.executable, "scripts/seed_demo_data.py"])
     run_step("market data integrity", [sys.executable, "scripts/verify_data_integrity.py", "--skip-demo-seed"])
     run_step("launch scripts", [sys.executable, "scripts/verify_launch_scripts.py"])

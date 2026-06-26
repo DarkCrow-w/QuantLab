@@ -46,6 +46,7 @@ cp config/quant.prod.env.example config/quant.env
 
 ```bash
 python scripts/verify_clone_start.py
+python scripts/verify_config_contract.py
 python scripts/verify_data_integrity.py
 python scripts/verify_deployment_config.py
 python scripts/verify_frontend_api_contract.py
@@ -60,6 +61,8 @@ python scripts/verify_windows_launch_smoke.py
 `verify_clone_start.py` 会检查后端导入、后端测试和前端生产构建。
 
 `verify_deployment_config.py` 会检查 Docker、Nginx、Compose 和生产环境模板。
+
+`verify_config_contract.py` 会检查本地/生产配置模板键集合、端口、CORS 和启停脚本默认端口是否一致。
 
 `verify_data_integrity.py` 会直接读取本地行情数据，检查股票池规模、缓存数量、OHLCV 合法性、指标列完整性和 catalog 一致性。
 
