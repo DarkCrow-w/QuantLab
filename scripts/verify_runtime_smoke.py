@@ -211,6 +211,10 @@ def main() -> int:
     ensure(health.get("status") == "ok", "API health is not ok")
     report["health"] = health
 
+    openapi = request(client, "get", "/openapi.json")
+    assert_clean_text(openapi, "openapi")
+    report["openapi_paths"] = len(openapi.get("paths", {}))
+
     system = request(client, "get", "/api/system/status")
     ensure(system.get("status") == "ok", "System status is not ok")
     report["system_score"] = system.get("score")
