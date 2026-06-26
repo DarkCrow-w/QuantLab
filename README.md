@@ -67,7 +67,7 @@ cd web && npm ci && cd ..
 .\.venv\Scripts\python.exe scripts\verify_windows_launch_smoke.py
 ```
 
-这会验证后端导入、后端测试、前端生产构建、前端文案编码、部署配置，以及真实本地数据下的核心 API 链路。
+这会验证后端导入、后端测试、运行时 API 冒烟、前端生产构建、前端文案编码、部署配置，以及真实本地数据下的核心链路。
 
 ## 当前模块
 
