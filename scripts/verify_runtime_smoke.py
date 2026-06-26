@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -60,6 +61,147 @@ def choose_symbol(preferred: str, cache: list[Any]) -> str:
     return symbols[0]
 
 
+def verify_strategy_asset_crud(client: TestClient) -> bool:
+    payload = {
+        "name": f"runtime smoke strategy {uuid.uuid4().hex[:8]}",
+        "description": "created by runtime smoke verification",
+        "base_strategy": "ma_cross",
+        "params": {"fast_period": 5, "slow_period": 20},
+        "tags": ["runtime-smoke"],
+        "enabled": True,
+    }
+    created = request(client, "post", "/api/strategy/assets", json=payload)
+    asset_id = created["id"]
+    try:
+        ensure(created["base_strategy"] == "ma_cross", "Strategy asset base strategy mismatch")
+        fetched = request(client, "get", f"/api/strategy/assets/{asset_id}")
+        ensure(fetched["id"] == asset_id, "Strategy asset fetch mismatch")
+        updated = request(
+            client,
+            "put",
+            f"/api/strategy/assets/{asset_id}",
+            json={**payload, "enabled": False, "params": {"fast_period": 8, "slow_period": 30}},
+        )
+        ensure(updated["enabled"] is False, "Strategy asset update did not persist")
+        listing = request(client, "get", "/api/strategy/assets")
+        ensure(any(item["id"] == asset_id for item in listing), "Strategy asset not found in listing")
+        assert_clean_text(updated, "strategy_asset")
+        return True
+    finally:
+        request(client, "delete", f"/api/strategy/assets/{asset_id}")
+
+
+def verify_factor_crud(client: TestClient) -> bool:
+    key = f"runtime_factor_{uuid.uuid4().hex[:8]}"
+    payload = {
+        "key": key,
+        "label": "Runtime Smoke Factor",
+        "category": "custom",
+        "description": "created by runtime smoke verification",
+        "expression": "close / close.shift(20) - 1",
+        "default_weight": 1.0,
+        "enabled": True,
+    }
+    created = request(client, "post", "/api/factors", json=payload)
+    factor_id = created["id"]
+    try:
+        ensure(created["key"] == key, "Factor key mismatch")
+        updated = request(client, "put", f"/api/factors/{factor_id}", json={**payload, "default_weight": 2.0})
+        ensure(updated["default_weight"] == 2.0, "Factor update did not persist")
+        listing = request(client, "get", "/api/factors")
+        ensure(any(item["id"] == factor_id for item in listing), "Factor not found in listing")
+        assert_clean_text(updated, "factor_crud")
+        return True
+    finally:
+        request(client, "delete", f"/api/factors/{factor_id}")
+
+
+def verify_risk_rule_crud(client: TestClient) -> bool:
+    payload = {
+        "name": f"runtime smoke risk {uuid.uuid4().hex[:8]}",
+        "description": "created by runtime smoke verification",
+        "max_position_pct": 0.3,
+        "max_drawdown": 0.2,
+        "max_single_order_pct": 0.1,
+        "stop_loss_pct": 0.08,
+        "take_profit_pct": 0.25,
+        "max_symbols": 10,
+        "enabled": True,
+    }
+    created = request(client, "post", "/api/risk/rules", json=payload)
+    rule_id = created["id"]
+    try:
+        ensure(created["name"] == payload["name"], "Risk rule name mismatch")
+        updated = request(client, "put", f"/api/risk/rules/{rule_id}", json={**payload, "max_symbols": 5})
+        ensure(updated["max_symbols"] == 5, "Risk rule update did not persist")
+        listing = request(client, "get", "/api/risk/rules")
+        ensure(any(item["id"] == rule_id for item in listing), "Risk rule not found in listing")
+        evaluated = request(
+            client,
+            "post",
+            "/api/risk/evaluate",
+            json={
+                "rule_id": rule_id,
+                "equity": 1_000_000,
+                "position_value": 100_000,
+                "order_value": 50_000,
+                "drawdown": 0.05,
+                "symbol_count": 3,
+            },
+        )
+        ensure(any(check["key"] == "position" for check in evaluated["checks"]), "Risk checks missing position")
+        assert_clean_text(evaluated, "risk_rule_crud")
+        return True
+    finally:
+        request(client, "delete", f"/api/risk/rules/{rule_id}")
+
+
+def verify_composer_strategy_crud(client: TestClient) -> bool:
+    payload = {
+        "name": f"runtime smoke composer {uuid.uuid4().hex[:8]}",
+        "description": "created by runtime smoke verification",
+        "logic": "all",
+        "groups": [
+            {
+                "id": "group-1",
+                "name": "条件组",
+                "logic": "all",
+                "conditions": [
+                    {
+                        "id": "cond-1",
+                        "metric": "close",
+                        "operator": "gte",
+                        "value": 1,
+                        "weight": 1,
+                        "required": True,
+                        "enabled": True,
+                    }
+                ],
+            }
+        ],
+        "min_score": 0,
+        "top_n": 20,
+        "lookback": 120,
+    }
+    created = request(client, "post", "/api/screening/composer/strategies", json=payload)
+    strategy_id = created["id"]
+    try:
+        ensure(created["name"] == payload["name"], "Composer strategy name mismatch")
+        updated = request(
+            client,
+            "put",
+            f"/api/screening/composer/strategies/{strategy_id}",
+            json={**payload, "description": "updated by runtime smoke verification", "top_n": 10},
+        )
+        ensure(updated["top_n"] == 10, "Composer strategy update did not persist")
+        listing = request(client, "get", "/api/screening/composer/strategies")
+        ensure(any(item["id"] == strategy_id for item in listing), "Composer strategy not found in listing")
+        assert_clean_text(updated, "composer_strategy_crud")
+        return True
+    finally:
+        request(client, "delete", f"/api/screening/composer/strategies/{strategy_id}")
+
+
 def main() -> int:
     args = parse_args()
     client = TestClient(app)
@@ -96,6 +238,7 @@ def main() -> int:
     ensure(len(strategies) >= 4, f"Expected at least 4 strategies, got {len(strategies)}")
     assert_clean_text(strategies, "strategies")
     report["strategies"] = [item["name"] for item in strategies]
+    report["strategy_asset_crud"] = verify_strategy_asset_crud(client)
 
     backtest = request(
         client,
@@ -121,6 +264,7 @@ def main() -> int:
     ensure(len(factors) >= 5, f"Expected at least 5 managed factors, got {len(factors)}")
     assert_clean_text(factors, "factors")
     report["factors"] = len(factors)
+    report["factor_crud"] = verify_factor_crud(client)
 
     mining = request(
         client,
@@ -146,6 +290,7 @@ def main() -> int:
     ensure(len(metrics) >= 10, f"Expected composer metrics, got {len(metrics)}")
     assert_clean_text(metrics, "composer_metrics")
     report["composer_metrics"] = len(metrics)
+    report["composer_strategy_crud"] = verify_composer_strategy_crud(client)
 
     risk = request(
         client,
@@ -173,6 +318,7 @@ def main() -> int:
     ensure(len(risk.get("checks", [])) >= 4, "Risk evaluation returned too few checks")
     assert_clean_text(risk, "risk")
     report["risk_passed"] = risk["passed"]
+    report["risk_rule_crud"] = verify_risk_rule_crud(client)
 
     research = request(client, "get", "/api/research/summary")
     ensure(research.get("total_backtests", 0) > 0, "Research summary has no backtests after smoke run")
