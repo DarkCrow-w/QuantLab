@@ -1,144 +1,133 @@
 #!/usr/bin/env python3
-"""
-回测入口。用法：
+"""Command-line backtest entry for QuantLab.
 
-  python run_backtest.py                          # 默认: 茅台 MA交叉 2023~2024
-  python run_backtest.py -s 600519 000858         # 多只股票
+Examples:
+
+  python run_backtest.py
+  python run_backtest.py -s 600519 000858
   python run_backtest.py -s 600519 --fast 10 --slow 30
   python run_backtest.py --start 2022-01-01 --end 2024-06-30
-  python run_backtest.py -c configs/backtest_ma_cross.yaml   # 用YAML配置
+  python run_backtest.py -c configs/backtest_ma_cross.yaml
 """
+
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
+from typing import Any
 
+import pandas as pd
 import yaml
 from loguru import logger
 
-from quant.data.akshare_feed import AKShareFeed
-from quant.data.baostock_feed import BaostockFeed
-from quant.data.csv_feed import CSVFeed
-from quant.data.tdx_feed import TDXFeed
-from quant.data.tushare_feed import TuShareFeed
-from quant.engine.backtest import BacktestEngine
-from quant.execution.simulated import SimulatedBroker
-from quant.risk.basic import BasicRiskManager
-from quant.strategy.registry import BASIC_STRATEGY_CLASSES, get_basic_strategy_class
+from quant.strategy.registry import BASIC_STRATEGY_CLASSES
+from server.models.backtest import BacktestRequest, BacktestResult
+from server.services.backtest_service import run_backtest
 
 STRATEGY_MAP = BASIC_STRATEGY_CLASSES
 
 
-def parse_args():
-    p = argparse.ArgumentParser(description="量化回测")
-    p.add_argument("-c", "--config", help="YAML 配置文件路径")
-    p.add_argument("-s", "--symbols", nargs="+", default=["600519"], help="股票代码 (默认: 600519)")
-    p.add_argument("--start", default="2023-01-01", help="开始日期 (默认: 2023-01-01)")
-    p.add_argument("--end", default="2024-12-31", help="结束日期 (默认: 2024-12-31)")
-    p.add_argument("--strategy", default="ma_cross", choices=sorted(STRATEGY_MAP), help="策略名")
-    p.add_argument("--fast", type=int, default=5, help="快线周期 (默认: 5)")
-    p.add_argument("--slow", type=int, default=20, help="慢线周期 (默认: 20)")
-    p.add_argument("--cash", type=float, default=1_000_000, help="初始资金 (默认: 100万)")
-    p.add_argument("--pos-pct", type=float, default=0.3, help="单票最大仓位 (默认: 0.3)")
-    p.add_argument("--no-report", action="store_true", help="不生成HTML报告")
-    return p.parse_args()
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="QuantLab command-line backtest")
+    parser.add_argument("-c", "--config", help="YAML configuration file path")
+    parser.add_argument("-s", "--symbols", nargs="+", default=["600519"], help="Stock symbols")
+    parser.add_argument("--start", default="2023-01-01", help="Start date")
+    parser.add_argument("--end", default="2024-12-31", help="End date")
+    parser.add_argument("--strategy", default="ma_cross", choices=sorted(BASIC_STRATEGY_CLASSES), help="Strategy name")
+    parser.add_argument("--fast", type=int, default=5, help="Fast MA period for ma_cross")
+    parser.add_argument("--slow", type=int, default=20, help="Slow MA period for ma_cross")
+    parser.add_argument("--cash", type=float, default=1_000_000, help="Initial cash")
+    parser.add_argument("--pos-pct", type=float, default=0.3, help="Max position percent per symbol")
+    parser.add_argument("--max-drawdown", type=float, default=0.2, help="Max drawdown circuit breaker")
+    parser.add_argument("--commission-rate", type=float, default=0.00025, help="Commission rate")
+    parser.add_argument("--output-dir", default="results", help="Output directory")
+    return parser.parse_args()
 
 
-def load_config(path: str) -> dict:
-    with open(path) as f:
-        return yaml.safe_load(f)
+def load_config(path: str) -> dict[str, Any]:
+    with open(path, encoding="utf-8") as file:
+        loaded = yaml.safe_load(file)
+    return loaded or {}
 
 
-def build_feed(cfg: dict):
-    source = cfg["data"]["source"]
-    common = dict(
-        start_date=cfg["data"]["start_date"],
-        end_date=cfg["data"]["end_date"],
-        use_cache=cfg["data"].get("use_cache", True),
+def request_from_config(config: dict[str, Any]) -> BacktestRequest:
+    data = config.get("data", {})
+    strategy = config.get("strategy", {})
+    risk = config.get("risk", {})
+    broker = config.get("broker", {})
+    engine = config.get("engine", {})
+    return BacktestRequest(
+        symbols=list(data.get("symbols", ["600519"])),
+        start_date=str(data.get("start_date", "2023-01-01")),
+        end_date=str(data.get("end_date", "2024-12-31")),
+        strategy=str(strategy.get("name", "ma_cross")),
+        strategy_params=dict(strategy.get("params", {})),
+        initial_cash=float(engine.get("initial_cash", 1_000_000)),
+        max_position_pct=float(risk.get("max_position_pct", 0.3)),
+        max_drawdown=float(risk.get("max_drawdown", 0.2)),
+        commission_rate=float(broker.get("commission_rate", 0.00025)),
     )
-    if source == "akshare":
-        feed = AKShareFeed(**common)
-    elif source == "baostock":
-        feed = BaostockFeed(**common)
-    elif source == "tdx":
-        feed = TDXFeed(**common)
-    elif source == "tushare":
-        feed = TuShareFeed(**common)
-    elif source == "csv":
-        feed = CSVFeed(csv_dir=cfg["data"]["csv_dir"])
-    else:
-        raise ValueError(f"Unknown data source: {source}")
-    feed.subscribe(cfg["data"]["symbols"])
-    return feed
 
 
-def build_config_from_args(args) -> dict:
-    return {
-        "data": {
-            "source": "akshare",
-            "symbols": args.symbols,
-            "start_date": args.start,
-            "end_date": args.end,
-            "use_cache": True,
-        },
-        "strategy": {
-            "name": args.strategy,
-            "params": {"fast_period": args.fast, "slow_period": args.slow},
-        },
-        "risk": {"max_position_pct": args.pos_pct, "max_drawdown": 0.2},
-        "broker": {"commission_rate": 0.00025, "min_commission": 5.0},
-        "engine": {"initial_cash": args.cash},
-        "report": {"output": "results/report.html"},
-    }
+def request_from_args(args: argparse.Namespace) -> BacktestRequest:
+    params: dict[str, Any] = {}
+    if args.strategy == "ma_cross":
+        params = {"fast_period": args.fast, "slow_period": args.slow}
+    return BacktestRequest(
+        symbols=args.symbols,
+        start_date=args.start,
+        end_date=args.end,
+        strategy=args.strategy,
+        strategy_params=params,
+        initial_cash=args.cash,
+        max_position_pct=args.pos_pct,
+        max_drawdown=args.max_drawdown,
+        commission_rate=args.commission_rate,
+    )
+
+
+def write_outputs(result: BacktestResult, output_dir: Path) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    metrics_path = output_dir / "metrics.json"
+    trades_path = output_dir / "trades.csv"
+    equity_path = output_dir / "equity_curve.csv"
+
+    metrics_path.write_text(
+        json.dumps(result.metrics.model_dump(), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    pd.DataFrame([item.model_dump() for item in result.equity_curve]).to_csv(equity_path, index=False)
+    pd.DataFrame([item.model_dump() for item in result.trades]).to_csv(trades_path, index=False)
+
+    logger.info("Metrics saved to {}", metrics_path)
+    logger.info("Equity curve saved to {}", equity_path)
+    logger.info("Trades saved to {}", trades_path)
+
+
+def print_summary(result: BacktestResult) -> None:
+    metrics = result.metrics
+    print("")
+    print("Backtest summary")
+    print("----------------")
+    print(f"Final equity     : {metrics.final_equity:,.2f}")
+    print(f"Total return     : {metrics.total_return:.2%}")
+    print(f"Annual return    : {metrics.annual_return:.2%}")
+    print(f"Max drawdown     : {metrics.max_drawdown:.2%}")
+    print(f"Trade count      : {metrics.trade_count}")
+    print(f"Total commission : {metrics.total_commission:,.2f}")
+    if metrics.sharpe_ratio is not None:
+        print(f"Sharpe ratio     : {metrics.sharpe_ratio:.4f}")
+    if metrics.win_rate is not None:
+        print(f"Win rate         : {metrics.win_rate:.2%}")
 
 
 def main() -> None:
     args = parse_args()
-
-    if args.config:
-        cfg = load_config(args.config)
-    else:
-        cfg = build_config_from_args(args)
-
-    feed = build_feed(cfg)
-
-    strat_name = cfg["strategy"]["name"]
-    strat_cls = get_basic_strategy_class(strat_name)
-    strategy = strat_cls(params=cfg["strategy"].get("params", {}))
-
-    risk_cfg = cfg.get("risk", {})
-    risk_manager = BasicRiskManager(
-        max_position_pct=risk_cfg.get("max_position_pct", 0.3),
-        max_drawdown=risk_cfg.get("max_drawdown", 0.2),
-    )
-
-    broker_cfg = cfg.get("broker", {})
-    broker = SimulatedBroker(
-        commission_rate=broker_cfg.get("commission_rate", 0.00025),
-        min_commission=broker_cfg.get("min_commission", 5.0),
-    )
-
-    initial_cash = cfg.get("engine", {}).get("initial_cash", 1_000_000)
-
-    engine = BacktestEngine(
-        feed=feed, strategy=strategy, risk_manager=risk_manager,
-        broker=broker, initial_cash=initial_cash,
-    )
-    eq = engine.run()
-    engine.print_summary(eq)
-
-    trades = engine.get_trades()
-    if not trades.empty:
-        Path("results").mkdir(exist_ok=True)
-        trades.to_csv("results/trades.csv", index=False)
-        logger.info("Trades saved to results/trades.csv")
-
-    if not args.no_report:
-        report_path = cfg.get("report", {}).get("output", "results/report.html")
-        try:
-            engine.generate_report(report_path)
-        except Exception as e:
-            logger.warning(f"Report generation failed: {e}")
+    request = request_from_config(load_config(args.config)) if args.config else request_from_args(args)
+    result = run_backtest(request)
+    print_summary(result)
+    write_outputs(result, Path(args.output_dir))
 
 
 if __name__ == "__main__":

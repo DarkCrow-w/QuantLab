@@ -13,7 +13,7 @@ class BacktestRequest(BaseModel):
     strategy_params: dict = Field(default_factory=dict, description="策略参数")
     initial_cash: float = Field(default=1_000_000, description="初始资金")
     max_position_pct: float = Field(default=0.3, description="单票最大仓位比例")
-    max_drawdown: float = Field(default=0.2, description="最大回撤止损")
+    max_drawdown: float = Field(default=0.2, description="最大回撤熔断阈值")
     commission_rate: float = Field(default=0.00025, description="佣金费率")
 
 

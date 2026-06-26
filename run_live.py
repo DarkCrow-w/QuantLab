@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
-"""Live trading entry point. Usage: python run_live.py configs/live.yaml"""
+"""Live trading entry point.
+
+Usage:
+
+  python run_live.py configs/live_ma_cross.yaml
+"""
+
 from __future__ import annotations
 
-import sys
+import argparse
 
 import yaml
-from loguru import logger
 
 from quant.config import get_settings
 from quant.data.akshare_feed import AKShareFeed
@@ -17,15 +22,24 @@ from quant.strategy.registry import BASIC_STRATEGY_CLASSES, get_basic_strategy_c
 STRATEGY_MAP = BASIC_STRATEGY_CLASSES
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="QuantLab live trading entry")
+    parser.add_argument(
+        "config",
+        nargs="?",
+        help="YAML configuration file path, for example configs/live_ma_cross.yaml",
+    )
+    return parser.parse_args()
+
+
 def main() -> None:
-    if len(sys.argv) < 2:
-        print("Usage: python run_live.py <config.yaml>")
-        sys.exit(1)
+    args = parse_args()
+    if not args.config:
+        raise SystemExit("Usage: python run_live.py <config.yaml>")
 
-    with open(sys.argv[1]) as f:
-        cfg = yaml.safe_load(f)
+    with open(args.config, encoding="utf-8") as file:
+        cfg = yaml.safe_load(file)
 
-    # Feed — live mode fetches recent data each tick
     feed = AKShareFeed(
         start_date=cfg["data"]["start_date"],
         end_date=cfg["data"]["end_date"],
@@ -33,8 +47,8 @@ def main() -> None:
     )
     feed.subscribe(cfg["data"]["symbols"])
 
-    strat_name = cfg["strategy"]["name"]
-    strategy = get_basic_strategy_class(strat_name)(params=cfg["strategy"].get("params", {}))
+    strategy_name = cfg["strategy"]["name"]
+    strategy = get_basic_strategy_class(strategy_name)(params=cfg["strategy"].get("params", {}))
 
     risk_cfg = cfg.get("risk", {})
     risk_manager = BasicRiskManager(
