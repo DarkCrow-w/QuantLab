@@ -170,6 +170,126 @@ def test_market_data_contract_exposes_cache_universe_and_series(monkeypatch):
     assert cache_status.json()[0]["freq"] == "day"
 
 
+def test_market_data_job_control_contract(monkeypatch):
+    from server.routers import market as market_router
+
+    def job(job_id: str = "job-1", status: str = "running") -> dict:
+        return {
+            "id": job_id,
+            "kind": "download",
+            "source": "tdx",
+            "status": status,
+            "running": status in {"queued", "running", "paused", "cancelling"},
+            "paused": status == "paused",
+            "total": 100,
+            "completed": 25,
+            "updated": 20,
+            "skipped": 4,
+            "failed": 1,
+            "current_symbol": "600000",
+            "current_status": "updated",
+            "percent": 25.0,
+            "elapsed_s": 2.5,
+            "speed": 10,
+            "eta_s": 8,
+            "recent": [
+                {
+                    "symbol": "600000",
+                    "status": "updated",
+                    "message": "",
+                    "updated_at": "2024-01-02T10:00:00",
+                }
+            ],
+            "result": {"requested_symbols": ["600000"]},
+        }
+
+    class FakeManager:
+        def __init__(self) -> None:
+            self.started: list[tuple] = []
+
+        def start(self, kind, source="tdx", symbols=None, workers=2, materialize_indicators=False):
+            self.started.append((kind, source, symbols, workers, materialize_indicators))
+            return {"status": "started", "job": job(status="running")}
+
+        def latest(self):
+            return job(status="running")
+
+        def get(self, job_id):
+            if job_id == "missing":
+                return None
+            if job_id == "completed":
+                return job(job_id=job_id, status="completed")
+            return job(job_id=job_id, status="running")
+
+        def pause(self, job_id):
+            if job_id == "missing":
+                return {"status": "not_found"}
+            if job_id == "completed":
+                return {"status": "invalid", "job": job(job_id=job_id, status="completed")}
+            return {"status": "paused", "job": job(job_id=job_id, status="paused")}
+
+        def resume(self, job_id):
+            if job_id == "missing":
+                return {"status": "not_found"}
+            if job_id == "completed":
+                return {"status": "invalid", "job": job(job_id=job_id, status="completed")}
+            return {"status": "resumed", "job": job(job_id=job_id, status="running")}
+
+        def cancel(self, job_id):
+            if job_id == "missing":
+                return {"status": "not_found"}
+            if job_id == "completed":
+                return {"status": "invalid", "job": job(job_id=job_id, status="completed")}
+            return {"status": "cancelling", "job": job(job_id=job_id, status="cancelling")}
+
+    manager = FakeManager()
+    monkeypatch.setattr(market_router, "get_data_job_manager", lambda: manager)
+    client = TestClient(app)
+
+    update = client.post(
+        "/api/market/update",
+        json={"symbols": ["600000"], "source": "tdx", "workers": 1},
+    )
+    assert update.status_code == 200
+    assert update.json()["status"] == "started"
+    assert manager.started[-1][:4] == ("update", "tdx", ["600000"], 1)
+
+    download = client.post("/api/market/download-all", json={"source": "tdx", "workers": 1})
+    assert download.status_code == 200
+    assert download.json()["job"]["percent"] == 25.0
+    assert manager.started[-1][0] == "download"
+
+    current = client.get("/api/market/jobs/current")
+    progress = client.get("/api/market/download-all/progress")
+    assert current.status_code == 200
+    assert progress.status_code == 200
+    assert current.json()["recent"][0]["symbol"] == "600000"
+    assert progress.json()["running"] is True
+
+    detail = client.get("/api/market/jobs/job-1")
+    assert detail.status_code == 200
+    assert detail.json()["id"] == "job-1"
+
+    paused = client.post("/api/market/jobs/job-1/pause")
+    assert paused.status_code == 200
+    assert paused.json()["status"] == "paused"
+    assert paused.json()["job"]["paused"] is True
+
+    resumed = client.post("/api/market/jobs/job-1/resume")
+    assert resumed.status_code == 200
+    assert resumed.json()["status"] == "resumed"
+
+    cancelling = client.post("/api/market/jobs/job-1/cancel")
+    assert cancelling.status_code == 200
+    assert cancelling.json()["status"] == "cancelling"
+
+    assert client.get("/api/market/jobs/missing").status_code == 404
+    assert client.post("/api/market/jobs/missing/pause").status_code == 404
+    assert client.post("/api/market/jobs/completed/pause").status_code == 409
+    assert client.post("/api/market/jobs/completed/resume").status_code == 409
+    assert client.post("/api/market/jobs/completed/cancel").status_code == 409
+
+
 def test_strategy_list_and_composer_strategy_contract():
     client = TestClient(app)
 
