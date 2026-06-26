@@ -21,7 +21,7 @@ def parse_args() -> argparse.Namespace:
         description="Run QuantLab runtime smoke checks against local data and API contracts."
     )
     parser.add_argument("--min-universe", type=int, default=1000, help="Minimum expected stock universe size.")
-    parser.add_argument("--min-cache", type=int, default=2, help="Minimum expected cached symbol count.")
+    parser.add_argument("--min-cache", type=int, default=5, help="Minimum expected cached symbol count.")
     parser.add_argument("--symbol", default="600519", help="Preferred smoke-test symbol.")
     return parser.parse_args()
 
@@ -65,6 +65,15 @@ def choose_symbol(preferred: str, cache: list[Any]) -> str:
         return preferred
     ensure(bool(symbols), "No cached symbols available")
     return symbols[0]
+
+
+def system_check_detail(system: dict[str, Any], key: str) -> dict[str, Any]:
+    for check in system.get("checks", []):
+        if check.get("key") == key:
+            detail = check.get("detail") or {}
+            ensure(isinstance(detail, dict), f"System check {key} detail is not an object")
+            return detail
+    raise AssertionError(f"System check {key} is missing")
 
 
 def verify_strategy_asset_crud(client: TestClient) -> bool:
@@ -232,13 +241,36 @@ def main() -> int:
 
     universe = request(client, "get", "/api/market/universe")
     ensure(len(universe) >= args.min_universe, f"Universe too small: {len(universe)} < {args.min_universe}")
+    universe_symbols = {item.get("symbol") for item in universe if isinstance(item, dict)}
     report["universe"] = len(universe)
 
     cache = request(client, "get", "/api/market/cache")
     ensure(len(cache) >= args.min_cache, f"Cache too small: {len(cache)} < {args.min_cache}")
     symbol = choose_symbol(args.symbol, cache)
+    cached_symbols = {item["symbol"] if isinstance(item, dict) else str(item) for item in cache}
+    ensure(
+        cached_symbols.issubset(universe_symbols),
+        f"Cached symbols missing from universe: {sorted(cached_symbols - universe_symbols)[:10]}",
+    )
     report["cache"] = len(cache)
     report["symbol"] = symbol
+
+    cache_status = request(client, "get", "/api/market/cache/status")
+    ensure(len(cache_status) == len(cache), f"Cache status count mismatch: {len(cache_status)} != {len(cache)}")
+    status_symbols = {item.get("symbol") for item in cache_status if isinstance(item, dict)}
+    ensure(cached_symbols == status_symbols, "Cache status symbols do not match cache symbols")
+    report["cache_status"] = len(cache_status)
+
+    data_cache = system_check_detail(system, "data_cache")
+    universe_summary = system_check_detail(system, "universe")
+    ensure(
+        int(data_cache.get("cached_symbols", -1)) == len(cache),
+        "System cached_symbols does not match /api/market/cache",
+    )
+    ensure(
+        int(universe_summary.get("symbols", -1)) == len(universe),
+        "System universe symbol count does not match /api/market/universe",
+    )
 
     data_job = request(client, "get", "/api/market/jobs/current")
     ensure("status" in data_job and "running" in data_job, "Data job status response is missing expected fields")
@@ -253,6 +285,20 @@ def main() -> int:
     )
     ensure(len(kline) >= 30, f"Kline data for {symbol} is too short: {len(kline)}")
     report["kline_bars"] = len(kline)
+
+    indicators = request(client, "get", "/api/market/indicators")
+    ensure(len(indicators) >= 10, f"Expected at least 10 indicators, got {len(indicators)}")
+    ensure(any(item["name"] == "MA" for item in indicators), "MA indicator is missing")
+    assert_clean_text(indicators, "indicators")
+    indicator_rows = request(
+        client,
+        "get",
+        "/api/market/indicator/MA",
+        params={"symbol": symbol, "start_date": "2024-01-01", "end_date": "2024-12-31"},
+    )
+    ensure(len(indicator_rows) >= 30, f"MA indicator data for {symbol} is too short: {len(indicator_rows)}")
+    report["indicators"] = len(indicators)
+    report["ma_indicator_rows"] = len(indicator_rows)
 
     strategies = request(client, "get", "/api/strategy/list")
     ensure(len(strategies) >= 4, f"Expected at least 4 strategies, got {len(strategies)}")
@@ -280,6 +326,30 @@ def main() -> int:
     ensure("metrics" in backtest and backtest["metrics"]["final_equity"] > 0, "Backtest metrics are invalid")
     report["backtest_trades"] = len(backtest.get("trades", []))
 
+    grid = request(
+        client,
+        "post",
+        "/api/backtest/grid",
+        json={
+            "base": {
+                "symbols": [symbol],
+                "start_date": "2024-01-01",
+                "end_date": "2024-12-31",
+                "strategy": "ma_cross",
+                "strategy_params": {},
+                "initial_cash": 1_000_000,
+            },
+            "parameters": {"fast_period": [5], "slow_period": [20]},
+            "max_runs": 2,
+            "sort_by": "total_return",
+            "sort_order": "desc",
+        },
+    )
+    ensure(grid["requested"] == 1 and grid["completed"] == 1, "Backtest grid smoke failed")
+    ensure(grid.get("best") and grid["best"].get("run_id"), "Backtest grid did not persist research run")
+    assert_clean_text(grid, "backtest_grid")
+    report["backtest_grid_completed"] = grid["completed"]
+
     factors = request(client, "get", "/api/factors")
     ensure(len(factors) >= 5, f"Expected at least 5 managed factors, got {len(factors)}")
     assert_clean_text(factors, "factors")
@@ -305,6 +375,21 @@ def main() -> int:
     ensure(score.get("total_scanned", 0) > 0, "Scoring did not scan any symbols")
     report["score_scanned"] = score["total_scanned"]
     report["score_returned"] = score["returned"]
+
+    classic_scan = request(
+        client,
+        "post",
+        "/api/screening/scan",
+        json={
+            "strategy": "ma_cross",
+            "strategy_params": {"fast_period": 5, "slow_period": 20},
+            "lookback": 120,
+        },
+    )
+    ensure(classic_scan.get("total_scanned", 0) > 0, "Classic screening did not scan any symbols")
+    assert_clean_text(classic_scan, "classic_screening")
+    report["classic_scan_scanned"] = classic_scan["total_scanned"]
+    report["classic_scan_matches"] = len(classic_scan.get("matches", []))
 
     metrics = request(client, "get", "/api/screening/composer/metrics")
     ensure(len(metrics) >= 10, f"Expected composer metrics, got {len(metrics)}")
