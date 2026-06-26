@@ -274,6 +274,7 @@ clone 后建议执行：
 .\.venv\Scripts\python.exe scripts\verify_production_frontend_smoke.py
 .\.venv\Scripts\python.exe scripts\verify_runtime_smoke.py
 .\.venv\Scripts\python.exe scripts\verify_fresh_clone_smoke.py
+.\.venv\Scripts\python.exe scripts\verify_windows_launch_smoke.py
 ```
 
 开发中常用验证：

@@ -54,6 +54,7 @@ python scripts/verify_launch_scripts.py
 python scripts/verify_production_frontend_smoke.py
 python scripts/verify_runtime_smoke.py
 python scripts/verify_fresh_clone_smoke.py
+python scripts/verify_windows_launch_smoke.py
 ```
 
 `verify_clone_start.py` 会检查后端导入、后端测试和前端生产构建。
@@ -67,6 +68,8 @@ python scripts/verify_fresh_clone_smoke.py
 `verify_frontend_ui_inventory.py` 会检查主导航、核心页面标题和关键操作文案，避免页面入口或管理功能在迭代中被误删。
 
 `verify_launch_scripts.py` 会检查 Windows/macOS/Linux 启停脚本的语法、依赖初始化顺序和健康检查等待逻辑。
+
+`verify_windows_launch_smoke.py` 会在 Windows 上实际调用 `quant.ps1 start/status/stop`，验证一键启动可以拉起前后端并完成清理。
 
 `verify_production_frontend_smoke.py` 会启动后端和生产前端预览，检查 `/api` 代理、HTML 入口和生产 bundle 启动风险。
 
