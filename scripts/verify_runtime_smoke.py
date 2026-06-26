@@ -310,6 +310,7 @@ def main() -> int:
         client,
         "post",
         "/api/backtest/run",
+        params={"save": False},
         json={
             "symbols": [symbol],
             "start_date": "2024-01-01",
@@ -330,6 +331,7 @@ def main() -> int:
         client,
         "post",
         "/api/backtest/grid",
+        params={"save": False},
         json={
             "base": {
                 "symbols": [symbol],
@@ -346,7 +348,7 @@ def main() -> int:
         },
     )
     ensure(grid["requested"] == 1 and grid["completed"] == 1, "Backtest grid smoke failed")
-    ensure(grid.get("best") and grid["best"].get("run_id"), "Backtest grid did not persist research run")
+    ensure(grid.get("best"), "Backtest grid did not return a best result")
     assert_clean_text(grid, "backtest_grid")
     report["backtest_grid_completed"] = grid["completed"]
 

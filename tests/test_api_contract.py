@@ -4,7 +4,13 @@ import uuid
 
 from fastapi.testclient import TestClient
 
-from server.models.backtest import BacktestGridItem, BacktestGridResult, BacktestRequest, PerformanceMetrics
+from server.models.backtest import (
+    BacktestGridItem,
+    BacktestGridResult,
+    BacktestRequest,
+    BacktestResult,
+    PerformanceMetrics,
+)
 from server.main import app
 
 
@@ -464,12 +470,48 @@ def test_backtest_run_contract_saves_research_asset(monkeypatch):
     assert len(saved_requests) == 1
     assert saved_requests[0][0].strategy == "composite:builtin_ma_cross"
 
+    no_save_response = client.post(
+        "/api/backtest/run",
+        params={"save": False},
+        json={
+            "symbols": ["600000"],
+            "start_date": "2024-01-01",
+            "end_date": "2024-12-31",
+            "strategy": "composite:builtin_ma_cross",
+            "strategy_params": {},
+            "initial_cash": 1000000,
+            "max_position_pct": 0.3,
+            "max_drawdown": 0.2,
+            "commission_rate": 0.00025,
+        },
+    )
+
+    assert no_save_response.status_code == 200
+    assert len(saved_requests) == 1
+
 
 def test_backtest_grid_contract_returns_ranked_experiment_items(monkeypatch):
     from server.routers import backtest as backtest_router
 
+    saved_requests = []
+
     def fake_grid(req, save_result=None):
         base = BacktestRequest(strategy_params={"fast_period": 5, "slow_period": 20})
+        result = BacktestResult(
+            metrics=PerformanceMetrics(
+                initial_cash=1000000,
+                final_equity=1010000,
+                total_return=0.01,
+                annual_return=0.04,
+                max_drawdown=-0.02,
+                trade_count=2,
+                total_commission=10,
+            ),
+            equity_curve=[],
+            trades=[],
+            kline_data={},
+        )
+        run_id = save_result(base, result) if save_result else None
         return BacktestGridResult(
             requested=1,
             completed=1,
@@ -480,21 +522,19 @@ def test_backtest_grid_contract_returns_ranked_experiment_items(monkeypatch):
                 status="completed",
                 strategy_params=base.strategy_params,
                 request=base,
-                run_id="run-1",
-                metrics=PerformanceMetrics(
-                    initial_cash=1000000,
-                    final_equity=1010000,
-                    total_return=0.01,
-                    annual_return=0.04,
-                    max_drawdown=-0.02,
-                    trade_count=2,
-                    total_commission=10,
-                ),
+                run_id=run_id,
+                metrics=result.metrics,
             ),
             results=[],
         )
 
+    class FakeResearchStore:
+        def save_backtest(self, req, result):
+            saved_requests.append((req, result))
+            return {"id": "run-1"}
+
     monkeypatch.setattr(backtest_router, "run_backtest_grid", fake_grid)
+    monkeypatch.setattr(backtest_router, "get_research_store", lambda: FakeResearchStore())
     client = TestClient(app)
 
     response = client.post(
@@ -514,6 +554,24 @@ def test_backtest_grid_contract_returns_ranked_experiment_items(monkeypatch):
     assert body["completed"] == 1
     assert body["failed"] == 0
     assert body["best"]["run_id"] == "run-1"
+    assert len(saved_requests) == 1
+
+    no_save_response = client.post(
+        "/api/backtest/grid",
+        params={"save": False},
+        json={
+            "base": {"strategy": "ma_cross", "strategy_params": {}},
+            "parameters": {"fast_period": [5], "slow_period": [20]},
+            "max_runs": 4,
+            "sort_by": "total_return",
+            "sort_order": "desc",
+        },
+    )
+
+    assert no_save_response.status_code == 200
+    no_save_body = no_save_response.json()
+    assert no_save_body["best"]["run_id"] is None
+    assert len(saved_requests) == 1
 
 
 def test_research_report_contract_returns_markdown(monkeypatch):
