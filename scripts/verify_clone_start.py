@@ -48,6 +48,7 @@ def main() -> None:
         raise SystemExit("npm was not found. Install Node.js LTS or rerun with --skip-web.")
     if not (WEB_DIR / "node_modules").exists():
         run_step("frontend dependencies", [npm, "ci"], cwd=WEB_DIR)
+    run_step("frontend text smoke", [sys.executable, "scripts/verify_frontend_text_smoke.py"])
     run_step("frontend production build", [npm, "run", "build"], cwd=WEB_DIR)
 
     print("\n[verify] QuantLab clone verification passed.")
