@@ -1,5 +1,18 @@
 import { useEffect, useState } from 'react';
-import { App as AntdApp, Button, Drawer, Form, Input, InputNumber, Select, Space, Switch, Table, Tag } from 'antd';
+import {
+  App as AntdApp,
+  Button,
+  Drawer,
+  Form,
+  Input,
+  InputNumber,
+  Popconfirm,
+  Select,
+  Space,
+  Switch,
+  Table,
+  Tag,
+} from 'antd';
 import { DeleteOutlined, EditOutlined, PlusOutlined, SaveOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import {
   createManagedFactor,
@@ -98,8 +111,12 @@ export default function FactorPage() {
           <p>管理内置与自定义因子，并对本地缓存股票做基础 IC 挖掘</p>
         </div>
         <Space>
-          <Button icon={<ThunderboltOutlined />} loading={miningLoading} onClick={runMining}>运行因子挖掘</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={startCreate}>自定义因子</Button>
+          <Button icon={<ThunderboltOutlined />} loading={miningLoading} onClick={runMining}>
+            运行因子挖掘
+          </Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={startCreate}>
+            自定义因子
+          </Button>
         </Space>
       </div>
 
@@ -112,8 +129,18 @@ export default function FactorPage() {
             dataSource={factors}
             pagination={{ pageSize: 10 }}
             columns={[
-              { title: '因子', dataIndex: 'label', render: (v, row) => <Space><strong>{v}</strong><Tag>{row.source}</Tag>{row.enabled ? <Tag color="success">启用</Tag> : <Tag>停用</Tag>}</Space> },
-              { title: 'key', dataIndex: 'key', render: (v) => <span className="mono accent-text">{v}</span> },
+              {
+                title: '因子',
+                dataIndex: 'label',
+                render: (value, row) => (
+                  <Space>
+                    <strong>{value}</strong>
+                    <Tag>{row.source}</Tag>
+                    {row.enabled ? <Tag color="success">启用</Tag> : <Tag>停用</Tag>}
+                  </Space>
+                ),
+              },
+              { title: 'key', dataIndex: 'key', render: (value) => <span className="mono accent-text">{value}</span> },
               { title: '分类', dataIndex: 'category', width: 110 },
               { title: '权重', dataIndex: 'default_weight', width: 90 },
               { title: '表达式', dataIndex: 'expression', ellipsis: true },
@@ -122,8 +149,22 @@ export default function FactorPage() {
                 width: 120,
                 render: (_, row) => (
                   <Space>
-                    <Button icon={<EditOutlined />} onClick={() => startEdit(row)} />
-                    <Button danger disabled={row.source === 'builtin'} icon={<DeleteOutlined />} onClick={() => remove(row)} />
+                    <Button aria-label="编辑因子" icon={<EditOutlined />} onClick={() => startEdit(row)} />
+                    <Popconfirm
+                      title="删除因子"
+                      description="确认删除这个自定义因子？"
+                      okText="删除"
+                      cancelText="取消"
+                      disabled={row.source === 'builtin'}
+                      onConfirm={() => remove(row)}
+                    >
+                      <Button
+                        aria-label="删除因子"
+                        danger
+                        disabled={row.source === 'builtin'}
+                        icon={<DeleteOutlined />}
+                      />
+                    </Popconfirm>
                   </Space>
                 ),
               },
@@ -141,25 +182,64 @@ export default function FactorPage() {
             columns={[
               { title: '候选因子', dataIndex: 'label' },
               { title: '分类', dataIndex: 'category', width: 90 },
-              { title: 'IC', dataIndex: 'ic', width: 90, render: (v: number | null) => v == null ? '-' : v.toFixed(4) },
-              { title: '|IC|', dataIndex: 'abs_ic', width: 90, render: (v: number | null) => v == null ? '-' : v.toFixed(4) },
+              { title: 'IC', dataIndex: 'ic', width: 90, render: (value: number | null) => (value == null ? '-' : value.toFixed(4)) },
+              { title: '|IC|', dataIndex: 'abs_ic', width: 90, render: (value: number | null) => (value == null ? '-' : value.toFixed(4)) },
               { title: '样本', dataIndex: 'samples', width: 90 },
             ]}
           />
-          {mining && <div className="asset-note">扫描 {mining.symbols} 只标的，窗口 {mining.lookback}，未来 {mining.forward_days} 日收益。</div>}
+          {mining && (
+            <div className="asset-note">
+              扫描 {mining.symbols} 只标的，窗口 {mining.lookback}，未来 {mining.forward_days} 日收益。
+            </div>
+          )}
         </div>
       </div>
 
       <Drawer title={editing ? '编辑因子' : '自定义因子'} open={open} size="large" onClose={() => setOpen(false)}>
         <Form layout="vertical">
-          <Form.Item label="Key"><Input value={draft.key} onChange={(e) => setDraft({ ...draft, key: e.target.value })} /></Form.Item>
-          <Form.Item label="名称"><Input value={draft.label} onChange={(e) => setDraft({ ...draft, label: e.target.value })} /></Form.Item>
-          <Form.Item label="分类"><Select value={draft.category} onChange={(category) => setDraft({ ...draft, category })} options={['trend', 'momentum', 'volume', 'risk', 'custom'].map((v) => ({ value: v, label: v }))} /></Form.Item>
-          <Form.Item label="默认权重"><InputNumber style={{ width: '100%' }} min={0} max={100} value={draft.default_weight} onChange={(default_weight) => setDraft({ ...draft, default_weight: Number(default_weight ?? 1) })} /></Form.Item>
-          <Form.Item label="表达式"><Input.TextArea rows={3} value={draft.expression} onChange={(e) => setDraft({ ...draft, expression: e.target.value })} placeholder="例如 close / close.shift(20) - 1" /></Form.Item>
-          <Form.Item label="说明"><Input.TextArea rows={4} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></Form.Item>
-          <Form.Item label="启用"><Switch checked={draft.enabled} onChange={(enabled) => setDraft({ ...draft, enabled })} /></Form.Item>
-          <Button type="primary" icon={<SaveOutlined />} block onClick={save}>保存因子</Button>
+          <Form.Item label="Key">
+            <Input value={draft.key} onChange={(event) => setDraft({ ...draft, key: event.target.value })} />
+          </Form.Item>
+          <Form.Item label="名称">
+            <Input value={draft.label} onChange={(event) => setDraft({ ...draft, label: event.target.value })} />
+          </Form.Item>
+          <Form.Item label="分类">
+            <Select
+              value={draft.category}
+              onChange={(category) => setDraft({ ...draft, category })}
+              options={['trend', 'momentum', 'volume', 'risk', 'custom'].map((value) => ({ value, label: value }))}
+            />
+          </Form.Item>
+          <Form.Item label="默认权重">
+            <InputNumber
+              style={{ width: '100%' }}
+              min={0}
+              max={100}
+              value={draft.default_weight}
+              onChange={(default_weight) => setDraft({ ...draft, default_weight: Number(default_weight ?? 1) })}
+            />
+          </Form.Item>
+          <Form.Item label="表达式">
+            <Input.TextArea
+              rows={3}
+              value={draft.expression}
+              onChange={(event) => setDraft({ ...draft, expression: event.target.value })}
+              placeholder="例如 close / close.shift(20) - 1"
+            />
+          </Form.Item>
+          <Form.Item label="说明">
+            <Input.TextArea
+              rows={4}
+              value={draft.description}
+              onChange={(event) => setDraft({ ...draft, description: event.target.value })}
+            />
+          </Form.Item>
+          <Form.Item label="启用">
+            <Switch checked={draft.enabled} onChange={(enabled) => setDraft({ ...draft, enabled })} />
+          </Form.Item>
+          <Button type="primary" icon={<SaveOutlined />} block onClick={save}>
+            保存因子
+          </Button>
         </Form>
       </Drawer>
     </div>

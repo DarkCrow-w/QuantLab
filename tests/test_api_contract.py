@@ -617,6 +617,7 @@ def test_factor_management_and_mining_contract(monkeypatch):
         mined = client.post("/api/factors/mine", json={"lookback": 120, "forward_days": 5, "min_samples": 10})
         assert mined.status_code == 200
         assert mined.json()["items"][0]["key"] == "momentum_20"
+        assert mined.json()["items"][0]["label"] == "20日动量"
     finally:
         deleted = client.delete(f"/api/factors/{factor['id']}")
         assert deleted.status_code == 200

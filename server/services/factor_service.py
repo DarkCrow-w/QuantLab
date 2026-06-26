@@ -161,7 +161,12 @@ def mine_factors(req: FactorMiningRequest) -> FactorMiningResult:
     warnings: list[str] = []
 
     for symbol in symbols:
-        df = store.get_kline(symbol, freq="day", with_indicators=True, tail=req.lookback + req.forward_days + 5)
+        df = store.get_kline(
+            symbol,
+            freq="day",
+            with_indicators=True,
+            tail=req.lookback + req.forward_days + 5,
+        )
         if df.empty or len(df) < req.min_samples + req.forward_days:
             continue
         frame = df.copy().reset_index(drop=True)
@@ -171,8 +176,14 @@ def mine_factors(req: FactorMiningRequest) -> FactorMiningResult:
         for key, fn in candidates.items():
             try:
                 series = fn(usable)
-                pairs = pd.DataFrame({"factor": series, "ret": target}).replace([math.inf, -math.inf], pd.NA).dropna()
-                values[key].extend((float(row.factor), float(row.ret)) for row in pairs.itertuples(index=False))
+                pairs = (
+                    pd.DataFrame({"factor": series, "ret": target})
+                    .replace([math.inf, -math.inf], pd.NA)
+                    .dropna()
+                )
+                values[key].extend(
+                    (float(row.factor), float(row.ret)) for row in pairs.itertuples(index=False)
+                )
             except Exception as exc:
                 if len(warnings) < 5:
                     warnings.append(f"{symbol} {key}: {exc}")
@@ -226,7 +237,7 @@ def _candidate_meta(key: str) -> tuple[str, str]:
         "momentum_60": ("60日动量", "momentum"),
         "volatility_20": ("20日波动率", "risk"),
         "volume_ratio_20": ("20日量比", "volume"),
-        "ma_gap_20": ("20日均线乖离", "trend"),
+        "ma_gap_20": ("20日均线偏离", "trend"),
         "turnover_amount_20": ("20日成交额均值", "liquidity"),
     }
     return meta[key]
