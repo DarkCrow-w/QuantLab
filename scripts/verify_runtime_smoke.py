@@ -1,0 +1,190 @@
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+from typing import Any
+
+from fastapi.testclient import TestClient
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from server.main import app
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Run QuantLab runtime smoke checks against local data and API contracts."
+    )
+    parser.add_argument("--min-universe", type=int, default=1000, help="Minimum expected stock universe size.")
+    parser.add_argument("--min-cache", type=int, default=2, help="Minimum expected cached symbol count.")
+    parser.add_argument("--symbol", default="600519", help="Preferred smoke-test symbol.")
+    return parser.parse_args()
+
+
+def ensure(condition: bool, message: str) -> None:
+    if not condition:
+        raise AssertionError(message)
+
+
+def request(client: TestClient, method: str, path: str, **kwargs) -> Any:
+    response = getattr(client, method)(path, **kwargs)
+    ensure(response.status_code == 200, f"{method.upper()} {path} failed: {response.status_code} {response.text}")
+    return response.json()
+
+
+def assert_clean_text(value: Any, path: str = "root") -> None:
+    if isinstance(value, str):
+        ensure("\ufffd" not in value, f"{path} contains replacement character")
+        ensure("????" not in value, f"{path} contains question-mark mojibake")
+        ensure(not any("\ue000" <= char <= "\uf8ff" for char in value), f"{path} contains private-use mojibake")
+        return
+    if isinstance(value, list):
+        for index, item in enumerate(value):
+            assert_clean_text(item, f"{path}[{index}]")
+        return
+    if isinstance(value, dict):
+        for key, item in value.items():
+            assert_clean_text(key, f"{path}.key")
+            assert_clean_text(item, f"{path}.{key}")
+
+
+def choose_symbol(preferred: str, cache: list[Any]) -> str:
+    symbols = [item["symbol"] if isinstance(item, dict) else str(item) for item in cache]
+    if preferred in symbols:
+        return preferred
+    ensure(bool(symbols), "No cached symbols available")
+    return symbols[0]
+
+
+def main() -> int:
+    args = parse_args()
+    client = TestClient(app)
+    report: dict[str, Any] = {}
+
+    health = request(client, "get", "/api/health")
+    ensure(health.get("status") == "ok", "API health is not ok")
+    report["health"] = health
+
+    system = request(client, "get", "/api/system/status")
+    ensure(system.get("status") == "ok", "System status is not ok")
+    report["system_score"] = system.get("score")
+
+    universe = request(client, "get", "/api/market/universe")
+    ensure(len(universe) >= args.min_universe, f"Universe too small: {len(universe)} < {args.min_universe}")
+    report["universe"] = len(universe)
+
+    cache = request(client, "get", "/api/market/cache")
+    ensure(len(cache) >= args.min_cache, f"Cache too small: {len(cache)} < {args.min_cache}")
+    symbol = choose_symbol(args.symbol, cache)
+    report["cache"] = len(cache)
+    report["symbol"] = symbol
+
+    kline = request(
+        client,
+        "get",
+        "/api/market/kline",
+        params={"symbol": symbol, "start_date": "2024-01-01", "end_date": "2024-12-31"},
+    )
+    ensure(len(kline) >= 30, f"Kline data for {symbol} is too short: {len(kline)}")
+    report["kline_bars"] = len(kline)
+
+    strategies = request(client, "get", "/api/strategy/list")
+    ensure(len(strategies) >= 4, f"Expected at least 4 strategies, got {len(strategies)}")
+    assert_clean_text(strategies, "strategies")
+    report["strategies"] = [item["name"] for item in strategies]
+
+    backtest = request(
+        client,
+        "post",
+        "/api/backtest/run",
+        json={
+            "symbols": [symbol],
+            "start_date": "2024-01-01",
+            "end_date": "2024-12-31",
+            "strategy": "ma_cross",
+            "strategy_params": {"fast_period": 5, "slow_period": 20},
+            "initial_cash": 1_000_000,
+            "max_position_pct": 0.3,
+            "max_drawdown": 0.2,
+            "commission_rate": 0.00025,
+        },
+    )
+    ensure(backtest["equity_curve"], "Backtest returned an empty equity curve")
+    ensure("metrics" in backtest and backtest["metrics"]["final_equity"] > 0, "Backtest metrics are invalid")
+    report["backtest_trades"] = len(backtest.get("trades", []))
+
+    factors = request(client, "get", "/api/factors")
+    ensure(len(factors) >= 5, f"Expected at least 5 managed factors, got {len(factors)}")
+    assert_clean_text(factors, "factors")
+    report["factors"] = len(factors)
+
+    mining = request(
+        client,
+        "post",
+        "/api/factors/mine",
+        json={"symbols": [symbol], "lookback": 120, "forward_days": 5, "min_samples": 5},
+    )
+    ensure(len(mining.get("items", [])) >= 3, "Factor mining returned too few candidates")
+    assert_clean_text(mining, "factor_mining")
+    report["factor_mining_items"] = len(mining["items"])
+
+    score = request(
+        client,
+        "post",
+        "/api/screening/score",
+        json={"lookback": 120, "top_n": 3, "max_symbols": 3},
+    )
+    ensure(score.get("total_scanned", 0) > 0, "Scoring did not scan any symbols")
+    report["score_scanned"] = score["total_scanned"]
+    report["score_returned"] = score["returned"]
+
+    metrics = request(client, "get", "/api/screening/composer/metrics")
+    ensure(len(metrics) >= 10, f"Expected composer metrics, got {len(metrics)}")
+    assert_clean_text(metrics, "composer_metrics")
+    report["composer_metrics"] = len(metrics)
+
+    risk = request(
+        client,
+        "post",
+        "/api/risk/evaluate",
+        json={
+            "draft": {
+                "name": "runtime smoke risk",
+                "description": "runtime smoke",
+                "max_position_pct": 0.3,
+                "max_drawdown": 0.2,
+                "max_single_order_pct": 0.1,
+                "stop_loss_pct": 0.08,
+                "take_profit_pct": 0.25,
+                "max_symbols": 10,
+                "enabled": True,
+            },
+            "equity": 1_000_000,
+            "position_value": 100_000,
+            "order_value": 50_000,
+            "drawdown": 0.05,
+            "symbol_count": 3,
+        },
+    )
+    ensure(len(risk.get("checks", [])) >= 4, "Risk evaluation returned too few checks")
+    assert_clean_text(risk, "risk")
+    report["risk_passed"] = risk["passed"]
+
+    research = request(client, "get", "/api/research/summary")
+    ensure(research.get("total_backtests", 0) > 0, "Research summary has no backtests after smoke run")
+    report["research_total_backtests"] = research["total_backtests"]
+
+    print(json.dumps({"status": "ok", "report": report}, ensure_ascii=False, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except Exception as exc:
+        print(json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False, indent=2), file=sys.stderr)
+        raise

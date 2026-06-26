@@ -266,6 +266,7 @@ clone 后建议执行：
 ```powershell
 .\.venv\Scripts\python.exe scripts\verify_clone_start.py
 .\.venv\Scripts\python.exe scripts\verify_deployment_config.py
+.\.venv\Scripts\python.exe scripts\verify_runtime_smoke.py
 ```
 
 开发中常用验证：
@@ -276,6 +277,8 @@ cd web
 npm run lint
 npm run build
 ```
+
+运行时烟测 `verify_runtime_smoke.py` 会使用本地真实数据检查健康状态、系统总览、股票池、缓存、K 线、策略列表、回测、因子挖掘、智能选股、组合指标、风控评估和研究资产摘要。
 
 ## 4. 架构
 

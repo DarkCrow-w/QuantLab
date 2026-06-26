@@ -222,6 +222,7 @@ clone 级验证：
 ```powershell
 .\.venv\Scripts\python.exe scripts\verify_clone_start.py
 .\.venv\Scripts\python.exe scripts\verify_deployment_config.py
+.\.venv\Scripts\python.exe scripts\verify_runtime_smoke.py
 ```
 
 上线前应同时完成：

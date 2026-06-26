@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
 from typing import Literal
+
+from pydantic import BaseModel, Field
 
 
 class ScreenRequest(BaseModel):
@@ -29,7 +30,7 @@ class ScreenResult(BaseModel):
 
 
 class FactorWeights(BaseModel):
-    """五维因子权重（未归一化，后端自动归一化）。"""
+    """Five-dimensional factor weights. The backend normalizes them automatically."""
 
     trend: float = 0.25
     momentum: float = 0.20
@@ -39,22 +40,22 @@ class FactorWeights(BaseModel):
 
 
 class ScoreRequest(BaseModel):
-    """多因子评分选股请求。"""
+    """Multi-factor stock scoring request."""
 
     scan_date: str | None = None
     lookback: int = 250
     weights: FactorWeights = Field(default_factory=FactorWeights)
     exclude_centipede: bool = True
     min_sandglass: float = 0.0
-    min_amount: float = 0.0  # 元
+    min_amount: float = 0.0
     min_price: float = 0.0
     use_patterns: bool = True
-    top_n: int = 100  # 返回前 N
-    max_symbols: int = 0  # 0=全市场；>0 仅扫前 N 只（调试/限速）
+    top_n: int = 100
+    max_symbols: int = 0
 
 
 class FactorScoreItem(BaseModel):
-    """五维因子分值（各 0-100）。"""
+    """Five-dimensional factor score from 0 to 100."""
 
     trend: float
     momentum: float
@@ -64,7 +65,7 @@ class FactorScoreItem(BaseModel):
 
 
 class ScoredStock(BaseModel):
-    """单只股票的多因子评分结果。"""
+    """Multi-factor score result for a single stock."""
 
     symbol: str
     score: float
@@ -83,18 +84,18 @@ class ScoredStock(BaseModel):
 
 
 class ScoreResult(BaseModel):
-    """多因子评分选股结果。"""
+    """Multi-factor stock scoring result."""
 
     scan_date: str
     total_scanned: int
-    total_matched: int  # 通过过滤的数量
-    returned: int  # = len(stocks)
+    total_matched: int
+    returned: int
     stocks: list[ScoredStock]
     elapsed_seconds: float
 
 
 class FactorDef(BaseModel):
-    """因子元数据（供前端展示与默认权重）。"""
+    """Factor metadata for frontend display and default weighting."""
 
     key: str
     label: str
