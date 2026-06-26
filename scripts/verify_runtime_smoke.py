@@ -217,6 +217,25 @@ def verify_composer_strategy_crud(client: TestClient) -> bool:
         request(client, "delete", f"/api/screening/composer/strategies/{strategy_id}")
 
 
+def ensure_research_backtest(client: TestClient, payload: dict[str, Any]) -> tuple[dict[str, Any], bool]:
+    research = request(client, "get", "/api/research/summary")
+    if research.get("total_backtests", 0) > 0:
+        return research, False
+
+    seeded = request(
+        client,
+        "post",
+        "/api/backtest/run",
+        params={"save": True},
+        json=payload,
+    )
+    ensure(seeded["equity_curve"], "Research seed backtest returned an empty equity curve")
+
+    research = request(client, "get", "/api/research/summary")
+    ensure(research.get("total_backtests", 0) > 0, "Research summary has no backtests after seed run")
+    return research, True
+
+
 def main() -> int:
     args = parse_args()
     client = TestClient(app)
@@ -306,22 +325,23 @@ def main() -> int:
     report["strategies"] = [item["name"] for item in strategies]
     report["strategy_asset_crud"] = verify_strategy_asset_crud(client)
 
+    backtest_payload = {
+        "symbols": [symbol],
+        "start_date": "2024-01-01",
+        "end_date": "2024-12-31",
+        "strategy": "ma_cross",
+        "strategy_params": {"fast_period": 5, "slow_period": 20},
+        "initial_cash": 1_000_000,
+        "max_position_pct": 0.3,
+        "max_drawdown": 0.2,
+        "commission_rate": 0.00025,
+    }
     backtest = request(
         client,
         "post",
         "/api/backtest/run",
         params={"save": False},
-        json={
-            "symbols": [symbol],
-            "start_date": "2024-01-01",
-            "end_date": "2024-12-31",
-            "strategy": "ma_cross",
-            "strategy_params": {"fast_period": 5, "slow_period": 20},
-            "initial_cash": 1_000_000,
-            "max_position_pct": 0.3,
-            "max_drawdown": 0.2,
-            "commission_rate": 0.00025,
-        },
+        json=backtest_payload,
     )
     ensure(backtest["equity_curve"], "Backtest returned an empty equity curve")
     ensure("metrics" in backtest and backtest["metrics"]["final_equity"] > 0, "Backtest metrics are invalid")
@@ -427,9 +447,9 @@ def main() -> int:
     report["risk_passed"] = risk["passed"]
     report["risk_rule_crud"] = verify_risk_rule_crud(client)
 
-    research = request(client, "get", "/api/research/summary")
-    ensure(research.get("total_backtests", 0) > 0, "Research summary has no backtests after smoke run")
+    research, seeded_research = ensure_research_backtest(client, backtest_payload)
     report["research_total_backtests"] = research["total_backtests"]
+    report["research_seeded"] = seeded_research
 
     runs = request(client, "get", "/api/research/backtests", params={"limit": 5})
     ensure(runs, "Research backtest listing is empty")
