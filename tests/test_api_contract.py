@@ -63,6 +63,29 @@ def test_system_status_contract_exposes_readiness_checks():
         assert isinstance(checks[key]["message"], str)
 
 
+def test_system_market_summary_matches_public_market_endpoints():
+    client = TestClient(app)
+
+    system = client.get("/api/system/status")
+    universe = client.get("/api/market/universe")
+    cache = client.get("/api/market/cache")
+    indicators = client.get("/api/market/indicators")
+    strategies = client.get("/api/strategy/list")
+
+    assert system.status_code == 200
+    for response in (universe, cache, indicators, strategies):
+        assert response.status_code == 200
+
+    checks = {check["key"]: check for check in system.json()["checks"]}
+    assert checks["universe"]["detail"]["symbols"] == len(universe.json())
+    assert checks["data_cache"]["detail"]["cached_symbols"] == len(cache.json())
+    assert checks["data_cache"]["detail"]["bars"] == sum(
+        int(row.get("bars") or 0) for row in cache.json()
+    )
+    assert checks["indicators"]["detail"]["count"] == len(indicators.json())
+    assert checks["strategies"]["detail"]["count"] == len(strategies.json())
+
+
 def test_trading_status_contract_is_read_only_and_manual_start():
     client = TestClient(app)
 
