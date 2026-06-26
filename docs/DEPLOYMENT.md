@@ -59,7 +59,7 @@ python scripts/verify_fresh_clone_smoke.py
 python scripts/verify_windows_launch_smoke.py
 ```
 
-`verify_clone_start.py` 会检查后端导入、配置、数据完整性、策略一致性、启动脚本、后端测试、运行时 API 冒烟和前端生产构建。
+`verify_clone_start.py` 会检查后端导入、配置、数据完整性、策略一致性、启动脚本、后端测试、运行时 API 冒烟、干净 clone 初始化和前端生产构建。
 
 `verify_deployment_config.py` 会检查 Docker、Nginx、Compose 和生产环境模板。
 
@@ -80,6 +80,8 @@ python scripts/verify_windows_launch_smoke.py
 `verify_production_frontend_smoke.py` 会启动后端和生产前端预览，检查 `/api` 代理、HTML 入口和生产 bundle 启动风险。
 
 `verify_runtime_smoke.py` 会用本地真实数据检查核心 API 链路和数据准备度，适合在上线前最后执行。
+
+`verify_fresh_clone_smoke.py` 会复制一个不含 `data/` 和 `config/quant.env` 的临时工作区，验证新 clone 能自动生成配置、股票池和 demo 行情缓存。
 
 开发中可以单独运行：
 

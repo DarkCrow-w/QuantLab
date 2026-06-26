@@ -46,6 +46,7 @@ def main() -> None:
     run_step("Windows launch smoke", [sys.executable, "scripts/verify_windows_launch_smoke.py"])
     run_step("backend tests", [sys.executable, "-m", "pytest", "-q"])
     run_step("runtime API smoke", [sys.executable, "scripts/verify_runtime_smoke.py", "--skip-demo-seed"])
+    run_step("fresh clone smoke", [sys.executable, "scripts/verify_fresh_clone_smoke.py"])
 
     if args.skip_web:
         print("\n[verify] frontend build skipped by request")
