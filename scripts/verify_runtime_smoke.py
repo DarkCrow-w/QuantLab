@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from scripts.seed_demo_data import seed_demo_data
 from server.main import app
 
 
@@ -23,6 +24,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--min-universe", type=int, default=1000, help="Minimum expected stock universe size.")
     parser.add_argument("--min-cache", type=int, default=5, help="Minimum expected cached symbol count.")
     parser.add_argument("--symbol", default="600519", help="Preferred smoke-test symbol.")
+    parser.add_argument("--skip-demo-seed", action="store_true", help="Do not create offline demo data before checks.")
     return parser.parse_args()
 
 
@@ -238,8 +240,13 @@ def ensure_research_backtest(client: TestClient, payload: dict[str, Any]) -> tup
 
 def main() -> int:
     args = parse_args()
+    seed_report = None
+    if not args.skip_demo_seed:
+        seed_report = seed_demo_data(ROOT / "data", min_cache=args.min_cache, min_universe=args.min_universe)
     client = TestClient(app)
     report: dict[str, Any] = {}
+    if seed_report is not None:
+        report["demo_seed"] = seed_report
 
     health = request(client, "get", "/api/health")
     ensure(health.get("status") == "ok", "API health is not ok")

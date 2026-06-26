@@ -98,6 +98,15 @@ function Test-BackendEnvironment {
     return $code -eq 0
 }
 
+function Ensure-DemoData {
+    if (!(Test-Path -LiteralPath $VenvPython)) { return }
+    Write-Info "Ensuring offline demo market data..."
+    $seedScript = Join-Path $Root "scripts\seed_demo_data.py"
+    & $VenvPython $seedScript
+    $code = $LASTEXITCODE
+    if ($code -ne 0) { throw "Offline demo data initialization failed with exit code $code." }
+}
+
 function Wait-Url([string]$Url, [string]$Name, [string]$LogFile) {
     for ($i = 0; $i -lt 60; $i++) {
         if (Test-Url $Url) { return }
@@ -191,6 +200,8 @@ Try one of these commands, then run start-windows.cmd again:
             Pop-Location
         }
     }
+
+    Ensure-DemoData
 }
 
 function Start-Services {
@@ -198,6 +209,7 @@ function Start-Services {
         !(Test-Path -LiteralPath (Join-Path $Root "web\node_modules"))) {
         Invoke-Setup
     }
+    Ensure-DemoData
     New-Item -ItemType Directory -Force -Path $PidDir, $LogDir | Out-Null
 
     $config = Read-Config

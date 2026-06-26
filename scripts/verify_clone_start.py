@@ -38,6 +38,7 @@ def main() -> None:
             "import server.main; print(server.main.health())",
         ],
     )
+    run_step("offline demo data seed", [sys.executable, "scripts/seed_demo_data.py"])
     run_step("backend tests", [sys.executable, "-m", "pytest", "-q"])
 
     if args.skip_web:

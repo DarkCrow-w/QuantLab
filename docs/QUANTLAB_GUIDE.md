@@ -280,7 +280,7 @@ npm run lint
 npm run build
 ```
 
-运行时烟测 `verify_runtime_smoke.py` 会使用本地真实数据检查健康状态、系统总览、股票池、缓存、K 线、策略列表、回测、因子挖掘、智能选股、组合指标、风控评估和研究资产摘要。
+运行时烟测 `verify_runtime_smoke.py` 会先确保离线 demo 数据存在，再使用本地数据检查健康状态、系统总览、股票池、缓存、K 线、策略列表、回测、因子挖掘、智能选股、组合指标、风控评估和研究资产摘要。
 前端文本烟测 `verify_frontend_text_smoke.py` 会扫描 React 源码和入口 HTML，拦截常见中文乱码、替换字符和问号乱码。
 
 ## 4. 架构

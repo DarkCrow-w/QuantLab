@@ -161,11 +161,17 @@ setup_frontend() {
     fi
 }
 
+seed_demo_data() {
+    info "Ensuring offline demo market data..."
+    (cd "$ROOT_DIR" && PYTHONPATH="$ROOT_DIR" QUANT_CONFIG_FILE="$CONFIG_FILE" "$(venv_python)" scripts/seed_demo_data.py) || return 1
+}
+
 cmd_setup() {
     copy_default_config
     load_config_file
     setup_backend || return 1
     setup_frontend || return 1
+    seed_demo_data || return 1
 }
 
 pid_alive() {
@@ -312,6 +318,7 @@ cmd_start() {
     copy_default_config
     load_config_file
     info "Starting Quant..."
+    seed_demo_data || return 1
     local failed=0
     start_backend || failed=1
     start_frontend || failed=1
