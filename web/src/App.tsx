@@ -11,6 +11,7 @@ const DataPage = lazy(() => import('./pages/DataPage'));
 const TradingPage = lazy(() => import('./pages/TradingPage'));
 const ResearchPage = lazy(() => import('./pages/ResearchPage'));
 const StrategyPage = lazy(() => import('./pages/StrategyPage'));
+const SampleLibraryPage = lazy(() => import('./pages/SampleLibraryPage'));
 const FactorPage = lazy(() => import('./pages/FactorPage'));
 const RiskPage = lazy(() => import('./pages/RiskPage'));
 const BacktestPage = lazy(() => import('./pages/BacktestPage'));
@@ -23,6 +24,7 @@ const pageKeys = [
   'trading',
   'research',
   'strategy',
+  'samples',
   'factors',
   'risk',
   'backtest',
@@ -38,6 +40,7 @@ const pagePath: Record<PageKey, string> = {
   trading: '/trading',
   research: '/research',
   strategy: '/strategy',
+  samples: '/samples',
   factors: '/factors',
   risk: '/risk',
   backtest: '/backtest',
@@ -134,6 +137,8 @@ export default function App() {
               <ResearchPage />
             ) : activePage === 'strategy' ? (
               <StrategyPage />
+            ) : activePage === 'samples' ? (
+              <SampleLibraryPage />
             ) : activePage === 'factors' ? (
               <FactorPage />
             ) : activePage === 'risk' ? (

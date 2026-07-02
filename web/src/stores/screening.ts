@@ -90,10 +90,10 @@ interface ScreeningStore {
 
   // Form state
   strategy: string;
-  strategyParams: Record<string, number>;
+  strategyParams: Record<string, number | string>;
   scanDate: string;
   setField: (field: string, value: unknown) => void;
-  setStrategyParam: (name: string, value: number) => void;
+  setStrategyParam: (name: string, value: number | string) => void;
 
   // Signal result
   result: ScreenResult | null;
@@ -159,7 +159,7 @@ export const useScreeningStore = create<ScreeningStore>((set, get) => ({
     set({ strategies });
     if (strategies.length > 0) {
       const first = strategies[0];
-      const params: Record<string, number> = {};
+      const params: Record<string, number | string> = {};
       first.params_schema.forEach((p) => {
         params[p.name] = p.default;
       });

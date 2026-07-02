@@ -12,13 +12,13 @@ interface BacktestStore {
   startDate: string;
   endDate: string;
   strategy: string;
-  strategyParams: Record<string, number>;
+  strategyParams: Record<string, number | string>;
   initialCash: number;
   maxPositionPct: number;
   maxDrawdown: number;
   commissionRate: number;
   setField: (field: string, value: unknown) => void;
-  setStrategyParam: (name: string, value: number) => void;
+  setStrategyParam: (name: string, value: number | string) => void;
 
   // Result
   result: BacktestResult | null;
@@ -47,16 +47,19 @@ export const useBacktestStore = create<BacktestStore>((set, get) => ({
     const current = get().strategy;
     set({ strategies });
     if (strategies.length > 0 && !strategies.some((item) => item.name === current)) {
-      const first = strategies.find((item) => item.name === 'composite:builtin_ma_cross') ?? strategies[0];
-      set({ strategy: first.name, strategyParams: {} });
+      const first = strategies.find((item) => item.name === 'ma_cross') ?? strategies[0];
+      const params = Object.fromEntries(
+        first.params_schema.map((param) => [param.name, param.default]),
+      );
+      set({ strategy: first.name, strategyParams: params });
     }
   },
 
   symbols: '600519',
   startDate: '2023-01-01',
   endDate: '2024-12-31',
-  strategy: 'composite:builtin_ma_cross',
-  strategyParams: {},
+  strategy: 'ma_cross',
+  strategyParams: { fast_period: 5, slow_period: 20 },
   initialCash: 1000000,
   maxPositionPct: 0.3,
   maxDrawdown: 0.2,

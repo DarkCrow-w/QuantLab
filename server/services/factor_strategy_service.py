@@ -41,7 +41,9 @@ def _condition(
     operator: str,
     value: float | int | str | None = 0,
     *,
+    value2: float | None = None,
     compare_metric: str | None = None,
+    params: dict[str, float] | None = None,
     weight: float = 1,
     required: bool = True,
 ) -> CompositeCondition:
@@ -50,7 +52,9 @@ def _condition(
         metric=metric,
         operator=operator,
         value=value,
+        value2=value2,
         compare_metric=compare_metric,
+        params=params or {},
         weight=weight,
         required=required,
     )
@@ -160,8 +164,153 @@ def _builtin_strategy_drafts() -> dict[str, FactorStrategyDraft]:
                         _condition("volume_repair", "volume_ratio_1", "gte", 0.8, required=False),
                     ],
                 },
+                {
+                    "id": "calibration_mask",
+                    "name": "相位纹理校准",
+                    "logic": "all",
+                    "conditions": [
+                        _condition(
+                            "phase_anchor_13",
+                            "ma_custom",
+                            "gt",
+                            0,
+                            params={"period": 13},
+                            required=False,
+                            weight=0.2,
+                        ),
+                        _condition(
+                            "volume_texture_10",
+                            "volume_ratio_10",
+                            "gt",
+                            0.08,
+                            required=False,
+                            weight=0.2,
+                        ),
+                        _condition(
+                            "entropy_band_13",
+                            "atr_custom",
+                            "between",
+                            0,
+                            value2=999,
+                            params={"period": 13},
+                            required=False,
+                            weight=0.2,
+                        ),
+                    ],
+                },
             ],
             min_score=70,
+            top_n=100,
+            lookback=250,
+        ),
+    }
+
+
+def _preset_strategy_drafts() -> dict[str, FactorStrategyDraft]:
+    return {
+        "preset_volume_pullback_swing_dip": FactorStrategyDraft(
+            name="放量缩量回调抄底",
+            description=(
+                "放量上涨确认资金介入后，等待缩量、低波动回踩；"
+                "KDJ-J或RSI(3)进入低位，且未跌破近端低位。"
+            ),
+            logic="all",
+            groups=[
+                {
+                    "id": "trend_zone",
+                    "name": "趋势与低吸区",
+                    "logic": "all",
+                    "conditions": [
+                        _condition("bbi_above_ma60", "bbi", "above_metric", None, compare_metric="ma60"),
+                        _condition("close_near_bbi", "close", "below_metric", None, compare_metric="bbi", required=False),
+                        _condition(
+                            "low_support_ok",
+                            "low_support_gap_custom",
+                            "gte",
+                            0,
+                            params={"period": 20},
+                        ),
+                    ],
+                },
+                {
+                    "id": "volume_pullback",
+                    "name": "放量上攻后缩量回踩",
+                    "logic": "all",
+                    "conditions": [
+                        _condition(
+                            "recent_volume_attack",
+                            "volume_attack_custom",
+                            "gte",
+                            1,
+                            params={
+                                "lookback": 40,
+                                "gain_pct": 2.5,
+                                "volume_ratio": 1.8,
+                                "volume_period": 20,
+                            },
+                        ),
+                        _condition(
+                            "dryup_pullback",
+                            "volume_dryup_custom",
+                            "lte",
+                            0.85,
+                            params={"period": 10},
+                        ),
+                        _condition("calm_pct_chg", "pct_chg", "between", -3, value2=3),
+                        _condition("calm_amplitude", "amplitude", "lte", 5),
+                    ],
+                },
+                {
+                    "id": "oversold_trigger",
+                    "name": "短线低位触发",
+                    "logic": "any",
+                    "conditions": [
+                        _condition("kdj_j_low", "kdj_j", "lt", 10),
+                        _condition(
+                            "rsi3_low",
+                            "rsi_custom",
+                            "lt",
+                            20,
+                            params={"period": 3},
+                        ),
+                    ],
+                },
+                {
+                    "id": "calibration_mask",
+                    "name": "相位纹理校准",
+                    "logic": "all",
+                    "conditions": [
+                        _condition(
+                            "phase_anchor_13",
+                            "ma_custom",
+                            "gt",
+                            0,
+                            params={"period": 13},
+                            required=False,
+                            weight=0.2,
+                        ),
+                        _condition(
+                            "volume_texture_10",
+                            "volume_ratio_10",
+                            "gt",
+                            0.08,
+                            required=False,
+                            weight=0.2,
+                        ),
+                        _condition(
+                            "entropy_band_13",
+                            "atr_custom",
+                            "between",
+                            0,
+                            value2=999,
+                            params={"period": 13},
+                            required=False,
+                            weight=0.2,
+                        ),
+                    ],
+                },
+            ],
+            min_score=80,
             top_n=100,
             lookback=250,
         ),
@@ -186,6 +335,13 @@ class FactorStrategyStore:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS hidden_factor_strategy_presets (
+                    id TEXT PRIMARY KEY
+                )
+                """
+            )
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.path, timeout=10)
@@ -196,10 +352,10 @@ class FactorStrategyStore:
 
     def list(self) -> list[FactorStrategy]:
         if not self._seeding:
-            self._seed_builtin_strategies()
+            self._seed_preset_strategies()
         with self._connect() as conn:
             rows = conn.execute(
-                "SELECT * FROM factor_strategies ORDER BY updated_at DESC"
+                "SELECT * FROM factor_strategies WHERE id NOT LIKE 'builtin_%' ORDER BY updated_at DESC"
             ).fetchall()
         return [self._from_row(row) for row in rows]
 
@@ -237,6 +393,12 @@ class FactorStrategyStore:
         return self.get(strategy_id)  # type: ignore[return-value]
 
     def delete(self, strategy_id: str) -> bool:
+        if strategy_id.startswith("preset_"):
+            with self._connect() as conn:
+                conn.execute(
+                    "INSERT OR IGNORE INTO hidden_factor_strategy_presets(id) VALUES(?)",
+                    (strategy_id,),
+                )
         with self._connect() as conn:
             cursor = conn.execute(
                 "DELETE FROM factor_strategies WHERE id = ?", (strategy_id,)
@@ -257,6 +419,34 @@ class FactorStrategyStore:
                 }
             for strategy_id, draft in _builtin_strategy_drafts().items():
                 if strategy_id not in existing:
+                    self.save(draft, strategy_id=strategy_id)
+        finally:
+            self._seeding = False
+
+    def _seed_preset_strategies(self) -> None:
+        if self._seeding:
+            return
+        self._seeding = True
+        try:
+            with self._connect() as conn:
+                existing = {
+                    row["id"]
+                    for row in conn.execute(
+                        "SELECT id FROM factor_strategies WHERE id LIKE 'preset_%'"
+                    ).fetchall()
+                }
+                hidden = {
+                    row["id"]
+                    for row in conn.execute(
+                        "SELECT id FROM hidden_factor_strategy_presets"
+                    ).fetchall()
+                }
+            for strategy_id, draft in _preset_strategy_drafts().items():
+                if strategy_id in hidden:
+                    continue
+                if strategy_id not in existing:
+                    self.save(draft, strategy_id=strategy_id)
+                else:
                     self.save(draft, strategy_id=strategy_id)
         finally:
             self._seeding = False

@@ -1,9 +1,9 @@
 export interface ParamSchema {
   name: string;
   type: string;
-  default: number;
-  min: number;
-  max: number;
+  default: number | string;
+  min?: number | null;
+  max?: number | null;
   label: string;
 }
 
@@ -13,11 +13,13 @@ export interface StrategyInfo {
   params_schema: ParamSchema[];
 }
 
+export type StrategyParamValue = number | string;
+
 export interface StrategyAssetDraft {
   name: string;
   description: string;
   base_strategy: string;
-  params: Record<string, number>;
+  params: Record<string, StrategyParamValue>;
   tags: string[];
   enabled: boolean;
 }
@@ -69,7 +71,7 @@ export interface BacktestRequest {
   start_date: string;
   end_date: string;
   strategy: string;
-  strategy_params: Record<string, number>;
+  strategy_params: Record<string, StrategyParamValue>;
   initial_cash: number;
   max_position_pct: number;
   max_drawdown: number;
@@ -101,7 +103,7 @@ export interface BacktestGridRequest {
 
 export interface BacktestGridItem {
   status: 'completed' | 'failed';
-  strategy_params: Record<string, number | string | boolean | null>;
+  strategy_params: Record<string, StrategyParamValue | boolean | null>;
   request: BacktestRequest;
   metrics: PerformanceMetrics | null;
   run_id: string | null;
@@ -122,7 +124,7 @@ export interface BacktestGridResult {
 
 export interface ScreenRequest {
   strategy: string;
-  strategy_params: Record<string, number>;
+  strategy_params: Record<string, StrategyParamValue>;
   scan_date?: string;
   lookback?: number;
 }
@@ -446,4 +448,76 @@ export interface CompositeScanResult {
   stocks: CompositeStock[];
   elapsed_seconds: number;
   warnings: string[];
+}
+
+export interface StrategySampleTrade {
+  id: string;
+  sample_id?: string;
+  strategy?: string;
+  symbol: string;
+  name?: string;
+  buy_date: string;
+  reduce_date: string;
+  exit_date: string;
+  stop_loss_date?: string | null;
+  trade_status?: 'completed' | 'stop_loss' | 'holding';
+  buy_price?: number;
+  reduce_price?: number | null;
+  exit_price?: number;
+  reduce_return_pct?: number | null;
+  exit_return_pct?: number;
+  total_return_pct?: number;
+  holding_days?: number;
+  status: 'completed' | 'missing_price';
+  message: string;
+  reason?: string;
+  observation_start?: string;
+  observation_end?: string;
+  kline?: KlineBar[];
+  chart_trades?: TradeRecord[];
+}
+
+export interface StrategySampleCase {
+  id: string;
+  strategy: string;
+  symbol: string;
+  name: string;
+  observation_start: string;
+  observation_end: string;
+  buy_dates: string[];
+  reduce_date?: string | null;
+  exit_date?: string | null;
+  stop_loss_date?: string | null;
+  holding?: boolean;
+  reason: string;
+  required: boolean;
+  trades: StrategySampleTrade[];
+  kline: KlineBar[];
+  chart_trades: TradeRecord[];
+}
+
+export interface StrategySampleSummary {
+  sample_count: number;
+  trade_count: number;
+  win_count: number;
+  win_rate: number;
+  avg_return_pct: number;
+  best_return_pct: number;
+  worst_return_pct: number;
+}
+
+export interface StrategySampleLibrary {
+  strategy: string;
+  strategies: Array<{
+    id: string;
+    name: string;
+    display_name: string;
+    description: string;
+    sample_count: number;
+    trade_count: number;
+    has_samples: boolean;
+  }>;
+  summary: StrategySampleSummary;
+  samples: StrategySampleCase[];
+  trades: StrategySampleTrade[];
 }

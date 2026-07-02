@@ -24,6 +24,7 @@ import type {
   ScreenResult,
   StrategyAsset,
   StrategyAssetDraft,
+  StrategySampleLibrary,
   StrategyInfo,
 } from '../types';
 
@@ -35,6 +36,10 @@ const api = axios.create({
 export async function fetchStrategyList(): Promise<StrategyInfo[]> {
   const { data } = await api.get<StrategyInfo[]>('/strategy/list');
   return data;
+}
+
+export async function deleteBasicStrategyTemplate(name: string): Promise<void> {
+  await api.delete(`/strategy/list/${name}`);
 }
 
 export async function fetchStrategyAssets(): Promise<StrategyAsset[]> {
@@ -57,6 +62,15 @@ export async function updateStrategyAsset(
 
 export async function deleteStrategyAsset(id: string): Promise<void> {
   await api.delete(`/strategy/assets/${id}`);
+}
+
+export async function fetchStrategySamples(
+  strategy = 'preset_volume_pullback_swing_dip',
+): Promise<StrategySampleLibrary> {
+  const { data } = await api.get<StrategySampleLibrary>('/strategy/samples', {
+    params: { strategy },
+  });
+  return data;
 }
 
 export interface HealthStatus {
@@ -114,7 +128,7 @@ export interface TradingStatus {
   entrypoint: string;
   strategy: {
     name: string;
-    params: Record<string, number>;
+    params: Record<string, number | string>;
   };
   data: {
     source: string;

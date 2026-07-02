@@ -80,6 +80,20 @@ def metric_registry() -> list[MetricDef]:
         MetricDef("volume_ratio_1", "较昨日量比", "volume", "成交量/上一交易日成交量", "倍"),
         MetricDef("volume_ratio_5", "量比(5日)", "volume", "成交量/5日均量", "倍"),
         MetricDef("volume_ratio_10", "量比(10日)", "volume", "成交量/10日均量", "倍"),
+        MetricDef("volume_dryup_custom", "缩量回调比", "volume", "成交量/前N日均量，用于识别缩量回踩", "倍", params=(MetricParam("period", "均量周期", 10, 2, 60),)),
+        MetricDef(
+            "volume_attack_custom",
+            "近端放量上攻",
+            "volume",
+            "最近N日是否出现放量阳线上攻，命中为1，否则为0",
+            params=(
+                MetricParam("lookback", "观察窗口", 40, 5, 120),
+                MetricParam("gain_pct", "单日涨幅", 2.5, 0.5, 10, 0.1),
+                MetricParam("volume_ratio", "放量倍数", 1.8, 1.0, 8, 0.1),
+                MetricParam("volume_period", "均量周期", 20, 2, 60),
+            ),
+        ),
+        MetricDef("low_support_gap_custom", "低位保护距离", "price", "收盘价相对近N日最低价的距离", "%", params=(MetricParam("period", "低位窗口", 20, 2, 120),)),
         MetricDef("obv_change_10", "OBV十日变化", "volume", "OBV相对十日前变化", "%"),
         MetricDef(
             "turnover_rate", "换手率", "fundamental",
@@ -240,6 +254,26 @@ class MetricContext:
             return df["volume"] / df["volume"].rolling(5, min_periods=1).mean()
         if key == "volume_ratio_10":
             return df["volume"] / df["volume"].rolling(10, min_periods=1).mean()
+        if key == "volume_dryup_custom":
+            period = max(2, int(params.get("period", 10)))
+            return df["volume"] / df["volume"].shift(1).rolling(period, min_periods=1).mean()
+        if key == "volume_attack_custom":
+            lookback = max(5, int(params.get("lookback", 40)))
+            gain_pct = float(params.get("gain_pct", 2.5))
+            volume_ratio = float(params.get("volume_ratio", 1.8))
+            volume_period = max(2, int(params.get("volume_period", 20)))
+            pct = df["close"].pct_change() * 100
+            avg_volume = df["volume"].shift(1).rolling(volume_period, min_periods=1).mean()
+            attack = (
+                (df["close"] > df["open"])
+                & (pct >= gain_pct)
+                & (df["volume"] >= avg_volume * volume_ratio)
+            ).astype(float)
+            return attack.shift(1).rolling(lookback, min_periods=1).max().fillna(0)
+        if key == "low_support_gap_custom":
+            period = max(2, int(params.get("period", 20)))
+            support = df["low"].rolling(period, min_periods=1).min()
+            return (df["close"] / support.replace(0, np.nan) - 1) * 100
         if key == "obv_change_10":
             obv = self.series("obv")
             return obv.pct_change(10) * 100

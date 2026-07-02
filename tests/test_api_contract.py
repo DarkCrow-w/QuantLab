@@ -320,6 +320,11 @@ def test_market_data_job_control_contract(monkeypatch):
 
 
 def test_strategy_list_and_composer_strategy_contract():
+    from server.services.strategy_visibility_service import get_strategy_visibility_store
+
+    for strategy_name in ("ma_cross", "vol_kdj_bbi", "bbi_kdj_trend", "dip_buy"):
+        get_strategy_visibility_store().show(strategy_name)
+
     client = TestClient(app)
 
     strategies = client.get("/api/strategy/list")
@@ -331,7 +336,20 @@ def test_strategy_list_and_composer_strategy_contract():
     metrics = client.get("/api/screening/composer/metrics")
     assert metrics.status_code == 200
     metric_keys = {item["key"] for item in metrics.json()}
-    assert {"ma5", "ma20", "kdj_j", "volume_ratio_1"} <= metric_keys
+    assert {
+        "ma5",
+        "ma20",
+        "kdj_j",
+        "volume_ratio_1",
+        "volume_attack_custom",
+        "volume_dryup_custom",
+        "low_support_gap_custom",
+    } <= metric_keys
+
+    composer_listing = client.get("/api/screening/composer/strategies")
+    assert composer_listing.status_code == 200
+    assert all(not item["id"].startswith("builtin_") for item in composer_listing.json())
+    assert any(item["id"] == "preset_volume_pullback_swing_dip" for item in composer_listing.json())
 
     payload = {
         "name": f"pytest composer {uuid.uuid4().hex[:8]}",
@@ -382,6 +400,45 @@ def test_strategy_list_and_composer_strategy_contract():
         deleted = client.delete(f"/api/screening/composer/strategies/{strategy['id']}")
         assert deleted.status_code == 200
         assert deleted.json() == {"status": "deleted"}
+
+
+def test_basic_strategy_template_can_be_deleted_without_reappearing():
+    from server.services.strategy_visibility_service import get_strategy_visibility_store
+
+    client = TestClient(app)
+
+    try:
+        deleted = client.delete("/api/strategy/list/ma_cross")
+
+        assert deleted.status_code == 200
+        assert deleted.json() == {"status": "deleted"}
+        strategies = client.get("/api/strategy/list")
+        assert strategies.status_code == 200
+        assert all(item["name"] != "ma_cross" for item in strategies.json())
+        assets = client.get("/api/strategy/assets")
+        assert assets.status_code == 200
+        assert all(item["id"] != "builtin_ma_cross" for item in assets.json())
+    finally:
+        get_strategy_visibility_store().show("ma_cross")
+        client.get("/api/strategy/assets")
+
+
+def test_legacy_builtin_composer_strategy_can_be_deleted():
+    from server.services.factor_strategy_service import FactorStrategyStore
+
+    client = TestClient(app)
+    FactorStrategyStore().get("builtin_ma_cross")
+
+    try:
+        deleted = client.delete("/api/screening/composer/strategies/builtin_ma_cross")
+
+        assert deleted.status_code == 200
+        assert deleted.json() == {"status": "deleted"}
+        listing = client.get("/api/screening/composer/strategies")
+        assert listing.status_code == 200
+        assert all(item["id"] != "builtin_ma_cross" for item in listing.json())
+    finally:
+        FactorStrategyStore().get("builtin_ma_cross")
 
 
 def test_backtest_run_contract_saves_research_asset(monkeypatch):
@@ -624,6 +681,56 @@ def test_strategy_asset_crud_contract():
     deleted = client.delete(f"/api/strategy/assets/{asset['id']}")
     assert deleted.status_code == 200
     assert deleted.json() == {"status": "deleted"}
+
+
+def test_strategy_sample_library_contract():
+    client = TestClient(app)
+
+    response = client.get(
+        "/api/strategy/samples",
+        params={"strategy": "preset_volume_pullback_swing_dip"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["strategy"] == "preset_volume_pullback_swing_dip"
+    assert any(
+        item["id"] == "preset_volume_pullback_swing_dip" and item["sample_count"] == 14
+        for item in body["strategies"]
+    )
+    assert body["summary"]["sample_count"] == 14
+    assert body["summary"]["trade_count"] == 17
+    assert body["samples"][0]["trades"]
+    trade = body["samples"][0]["trades"][0]
+    assert {"buy_price", "reduce_price", "exit_price", "total_return_pct"} <= set(trade)
+    assert body["samples"][0]["kline"]
+    assert body["samples"][0]["chart_trades"]
+
+    legacy = client.get("/api/strategy/samples", params={"strategy": "swing_dip_buy"})
+    assert legacy.status_code == 200
+    assert legacy.json()["strategy"] == "preset_volume_pullback_swing_dip"
+
+
+def test_builtin_strategy_asset_delete_hides_template():
+    from server.services.strategy_visibility_service import get_strategy_visibility_store
+
+    client = TestClient(app)
+
+    try:
+        assets = client.get("/api/strategy/assets")
+        assert assets.status_code == 200
+        assert any(item["id"] == "builtin_ma_cross" for item in assets.json())
+
+        deleted = client.delete("/api/strategy/assets/builtin_ma_cross")
+
+        assert deleted.status_code == 200
+        assert deleted.json() == {"status": "deleted"}
+        listing = client.get("/api/strategy/assets")
+        assert listing.status_code == 200
+        assert all(item["id"] != "builtin_ma_cross" for item in listing.json())
+    finally:
+        get_strategy_visibility_store().show("ma_cross")
+        client.get("/api/strategy/assets")
 
 
 def test_factor_management_and_mining_contract(monkeypatch):

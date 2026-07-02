@@ -8,6 +8,7 @@ from pathlib import Path
 
 from server.models.market import StrategyAsset, StrategyAssetDraft
 from server.services.backtest_service import STRATEGY_REGISTRY
+from server.services.strategy_visibility_service import get_strategy_visibility_store
 
 _DB_PATH = Path(__file__).resolve().parents[2] / "data" / "meta" / "strategies.sqlite3"
 
@@ -88,16 +89,25 @@ class StrategyAssetStore:
         return self.get(asset_id)  # type: ignore[return-value]
 
     def delete(self, asset_id: str) -> bool:
+        if asset_id.startswith("builtin_"):
+            get_strategy_visibility_store().hide(asset_id.removeprefix("builtin_"))
         with self._connect() as conn:
             cursor = conn.execute("DELETE FROM strategy_assets WHERE id = ?", (asset_id,))
         return cursor.rowcount > 0
 
     def _seed_defaults(self) -> None:
+        hidden = get_strategy_visibility_store().list_hidden()
         with self._connect() as conn:
-            count = conn.execute("SELECT COUNT(*) FROM strategy_assets").fetchone()[0]
-        if count:
-            return
+            existing_ids = {
+                str(row["id"])
+                for row in conn.execute("SELECT id FROM strategy_assets").fetchall()
+            }
         for name, info in STRATEGY_REGISTRY.items():
+            if name in hidden:
+                continue
+            asset_id = f"builtin_{name}"
+            if asset_id in existing_ids:
+                continue
             params = {param.name: param.default for param in info["params_schema"]}
             self.save(
                 StrategyAssetDraft(
@@ -108,7 +118,7 @@ class StrategyAssetStore:
                     tags=["builtin"],
                     enabled=True,
                 ),
-                asset_id=f"builtin_{name}",
+                asset_id=asset_id,
             )
 
     @staticmethod

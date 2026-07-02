@@ -3,6 +3,7 @@ import {
   Button,
   Collapse,
   DatePicker,
+  Input,
   InputNumber,
   Popconfirm,
   Segmented,
@@ -58,6 +59,7 @@ export default function ScreeningSidebar() {
   const currentStrategy = store.strategies.find((item) => item.name === store.strategy);
   const isComposer = store.mode === 'composer';
   const isScore = store.mode === 'score';
+  const canDeleteActiveFactorStrategy = Boolean(store.activeFactorStrategyId);
 
   const dateItem = {
     key: 'date',
@@ -105,14 +107,14 @@ export default function ScreeningSidebar() {
             </Button>
             <Popconfirm
               title="删除当前策略？"
-              disabled={!store.activeFactorStrategyId}
+              disabled={!canDeleteActiveFactorStrategy}
               onConfirm={store.removeFactorStrategy}
             >
               <Button
                 size="small"
                 danger
                 icon={<DeleteOutlined />}
-                disabled={!store.activeFactorStrategyId}
+                disabled={!canDeleteActiveFactorStrategy}
                 aria-label="删除当前策略"
               />
             </Popconfirm>
@@ -202,17 +204,26 @@ export default function ScreeningSidebar() {
           {currentStrategy?.params_schema.map((param) => (
             <div key={param.name}>
               <Text style={labelStyle}>{param.label}</Text>
-              <InputNumber
-                style={{ width: '100%' }}
-                size="small"
-                min={param.min}
-                max={param.max}
-                step={param.type === 'float' ? 0.1 : 1}
-                value={store.strategyParams[param.name] ?? param.default}
-                onChange={(value) =>
-                  value !== null && store.setStrategyParam(param.name, value)
-                }
-              />
+              {param.type === 'string' ? (
+                <Input
+                  style={{ width: '100%' }}
+                  size="small"
+                  value={String(store.strategyParams[param.name] ?? param.default ?? '')}
+                  onChange={(event) => store.setStrategyParam(param.name, event.target.value)}
+                />
+              ) : (
+                <InputNumber
+                  style={{ width: '100%' }}
+                  size="small"
+                  min={param.min ?? undefined}
+                  max={param.max ?? undefined}
+                  step={param.type === 'float' ? 0.1 : 1}
+                  value={Number(store.strategyParams[param.name] ?? param.default)}
+                  onChange={(value) =>
+                    value !== null && store.setStrategyParam(param.name, value)
+                  }
+                />
+              )}
             </div>
           ))}
         </div>

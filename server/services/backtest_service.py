@@ -30,6 +30,7 @@ from server.models.backtest import (
     TradeRecord,
 )
 from server.models.market import ParamSchema, StrategyInfo
+from server.services.strategy_visibility_service import get_strategy_visibility_store
 
 STRATEGY_REGISTRY: dict[str, dict] = {
     "ma_cross": {
@@ -88,7 +89,7 @@ STRATEGY_REGISTRY: dict[str, dict] = {
         "display_name": "波段抄底（KDJ+RSI+VOL+BBI）",
         "params_schema": [
             ParamSchema(name="lookback", type="int", default=30, min=20, max=80, label="观察窗口"),
-            ParamSchema(name="entry_score", type="int", default=4, min=3, max=9, label="入场评分"),
+            ParamSchema(name="entry_score", type="int", default=9, min=4, max=12, label="入场评分"),
             ParamSchema(name="kdj_j_threshold", type="int", default=18, min=5, max=35, label="KDJ-J低位阈值"),
             ParamSchema(name="rsi3_threshold", type="int", default=28, min=10, max=45, label="RSI(3)低位阈值"),
             ParamSchema(name="rsi6_threshold", type="int", default=32, min=15, max=50, label="RSI(6)低位阈值"),
@@ -96,17 +97,29 @@ STRATEGY_REGISTRY: dict[str, dict] = {
             ParamSchema(name="bbi_upper_band_pct", type="float", default=0.03, min=0.00, max=0.08, label="BBI上方容忍带"),
             ParamSchema(name="panic_volume_ratio", type="float", default=1.8, min=1.2, max=4.0, label="恐慌量倍数"),
             ParamSchema(name="dryup_ratio", type="float", default=0.85, min=0.50, max=1.10, label="缩量倍数"),
+            ParamSchema(name="attack_lookback", type="int", default=40, min=20, max=80, label="放量上攻窗口"),
+            ParamSchema(name="attack_gain_pct", type="float", default=2.5, min=1.0, max=8.0, label="上攻涨幅阈值"),
+            ParamSchema(name="attack_volume_ratio", type="float", default=1.8, min=1.2, max=6.0, label="上攻放量倍数"),
+            ParamSchema(name="calm_pct_chg", type="float", default=3.0, min=1.0, max=8.0, label="回调涨跌幅上限"),
+            ParamSchema(name="calm_amp_pct", type="float", default=5.0, min=2.0, max=12.0, label="回调振幅上限"),
+            ParamSchema(name="low_support_lookback", type="int", default=20, min=5, max=60, label="低位保护窗口"),
             ParamSchema(name="stop_loss_pct", type="float", default=0.055, min=0.02, max=0.12, label="硬止损"),
             ParamSchema(name="take_profit_pct", type="float", default=0.36, min=0.05, max=0.60, label="首段止盈"),
             ParamSchema(name="second_profit_pct", type="float", default=0.648, min=0.10, max=1.00, label="二段止盈"),
             ParamSchema(name="trailing_stop_pct", type="float", default=0.08, min=0.03, max=0.20, label="追踪止盈回撤"),
             ParamSchema(name="bbi_break_days", type="int", default=2, min=1, max=5, label="BBI破位天数"),
+            ParamSchema(name="phase_guard_enabled", type="bool", default="true", min=None, max=None, label="相位护栏"),
+            ParamSchema(name="phase_guard_floor", type="float", default=-0.35, min=-0.60, max=0.00, label="相位下沿"),
+            ParamSchema(name="phase_guard_ceiling", type="float", default=0.75, min=0.20, max=1.20, label="相位上沿"),
+            ParamSchema(name="volume_texture_floor", type="float", default=0.08, min=0.01, max=0.40, label="量能纹理"),
+            ParamSchema(name="entropy_band_ceiling", type="float", default=0.18, min=0.05, max=0.40, label="熵带上沿"),
         ],
     },
 }
 
 
 def get_strategy_list() -> list[StrategyInfo]:
+    hidden = get_strategy_visibility_store().list_hidden()
     return [
         StrategyInfo(
             name=name,
@@ -114,6 +127,7 @@ def get_strategy_list() -> list[StrategyInfo]:
             params_schema=info["params_schema"],
         )
         for name, info in STRATEGY_REGISTRY.items()
+        if name not in hidden
     ]
 
 
@@ -152,7 +166,7 @@ def _compute_enhanced_metrics(
     if len(daily_returns) > 1 and daily_returns.std() > 0:
         sharpe = round(float(daily_returns.mean() / daily_returns.std() * math.sqrt(252)), 4)
 
-    # Win rate & profit/loss ratio — pair BUY/SELL per symbol
+    # Win rate & profit/loss ratio 鈥?pair BUY/SELL per symbol
     win_rate = None
     pl_ratio = None
     if not trades_df.empty:
@@ -195,7 +209,7 @@ def run_backtest(req: BacktestRequest) -> BacktestResult:
     if registry_entry is None and not is_composite:
         raise ValueError(f"Unknown strategy: {req.strategy}")
 
-    # Build components — fallback 链 TuShare -> Baostock -> AKShare
+    # Build components 鈥?fallback 閾?TuShare -> Baostock -> AKShare
     feed = None
     last_err: Exception | None = None
     for cls in (TuShareFeed, BaostockFeed, AKShareFeed):
@@ -262,7 +276,7 @@ def run_backtest(req: BacktestRequest) -> BacktestResult:
                 commission=round(float(row["commission"]), 2),
             ))
 
-    # Build kline data from feed (uses DataFeed.get_dataframe — no private reach-in)
+    # Build kline data from feed (uses DataFeed.get_dataframe 鈥?no private reach-in)
     kline_data: dict[str, list[KlineBar]] = {}
     for sym in req.symbols:
         df = feed.get_dataframe(sym)

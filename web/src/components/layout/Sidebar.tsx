@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Button, DatePicker, InputNumber, Select, Space, Typography, Collapse } from 'antd';
+import { Button, DatePicker, Input, InputNumber, Select, Space, Typography, Collapse } from 'antd';
 import {
   CaretRightOutlined,
   ExperimentOutlined,
@@ -56,7 +56,7 @@ export default function Sidebar() {
                 store.setField('strategy', v);
                 const strat = store.strategies.find((s) => s.name === v);
                 if (strat) {
-                  const params: Record<string, number> = {};
+                  const params: Record<string, number | string> = {};
                   strat.params_schema.forEach((p) => { params[p.name] = p.default; });
                   store.setField('strategyParams', params);
                 }
@@ -68,15 +68,24 @@ export default function Sidebar() {
           {currentStrategy?.params_schema.map((p) => (
             <div key={p.name}>
               <Text style={labelStyle}>{p.label}</Text>
-              <InputNumber
-                style={{ width: '100%' }}
-                size="small"
-                min={p.min}
-                max={p.max}
-                step={p.type === 'float' ? 0.1 : 1}
-                value={store.strategyParams[p.name] ?? p.default}
-                onChange={(v) => v !== null && store.setStrategyParam(p.name, v)}
-              />
+              {p.type === 'string' ? (
+                <Input
+                  style={{ width: '100%' }}
+                  size="small"
+                  value={String(store.strategyParams[p.name] ?? p.default ?? '')}
+                  onChange={(event) => store.setStrategyParam(p.name, event.target.value)}
+                />
+              ) : (
+                <InputNumber
+                  style={{ width: '100%' }}
+                  size="small"
+                  min={p.min ?? undefined}
+                  max={p.max ?? undefined}
+                  step={p.type === 'float' ? 0.1 : 1}
+                  value={Number(store.strategyParams[p.name] ?? p.default)}
+                  onChange={(v) => v !== null && store.setStrategyParam(p.name, v)}
+                />
+              )}
             </div>
           ))}
         </div>

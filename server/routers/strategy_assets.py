@@ -41,6 +41,10 @@ def api_update_strategy_asset(asset_id: str, draft: StrategyAssetDraft):
 
 @router.delete("/{asset_id}")
 def api_delete_strategy_asset(asset_id: str):
-    if not get_strategy_asset_store().delete(asset_id):
+    try:
+        deleted = get_strategy_asset_store().delete(asset_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if not deleted:
         raise HTTPException(status_code=404, detail="strategy asset not found")
     return {"status": "deleted"}

@@ -83,7 +83,11 @@ def api_update_composer_strategy(strategy_id: str, draft: FactorStrategyDraft):
 
 @router.delete("/composer/strategies/{strategy_id}")
 def api_delete_composer_strategy(strategy_id: str):
-    if not strategy_store.delete(strategy_id):
+    try:
+        deleted = strategy_store.delete(strategy_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if not deleted:
         raise HTTPException(status_code=404, detail="strategy not found")
     return {"status": "deleted"}
 

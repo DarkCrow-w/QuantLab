@@ -15,6 +15,7 @@ import {
 import {
   AlertOutlined,
   BranchesOutlined,
+  BuildOutlined,
   CloudDownloadOutlined,
   CaretRightOutlined,
   DatabaseOutlined,
@@ -56,6 +57,7 @@ const navItems = [
   { value: 'trading', label: '交易运行', icon: <SafetyCertificateOutlined /> },
   { value: 'research', label: '研究资产', icon: <ProfileOutlined /> },
   { value: 'strategy', label: '策略管理', icon: <BranchesOutlined /> },
+  { value: 'samples', label: '样例库', icon: <BuildOutlined /> },
   { value: 'factors', label: '因子研究', icon: <FunctionOutlined /> },
   { value: 'risk', label: '风险控制', icon: <AlertOutlined /> },
   { value: 'backtest', label: '回测研究', icon: <ExperimentOutlined /> },

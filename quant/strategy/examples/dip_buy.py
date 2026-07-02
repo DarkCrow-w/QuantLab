@@ -129,6 +129,67 @@ def _ma(values: list[float], period: int) -> float:
     return sum(values[-period:]) / period
 
 
+def _recent_volume_attack(
+    bars: list[Bar],
+    *,
+    lookback: int,
+    min_gain_pct: float,
+    min_volume_ratio: float,
+    volume_ma_period: int,
+) -> bool:
+    if len(bars) < volume_ma_period + 2:
+        return False
+    start = max(volume_ma_period, len(bars) - lookback - 1)
+    for idx in range(start, len(bars) - 1):
+        bar = bars[idx]
+        prev = bars[idx - 1]
+        if prev.close <= 0 or bar.close <= bar.open:
+            continue
+        gain_pct = (bar.close / prev.close - 1) * 100
+        if gain_pct < min_gain_pct:
+            continue
+        prior = bars[idx - volume_ma_period:idx]
+        avg_volume = sum(item.volume for item in prior) / volume_ma_period
+        if avg_volume > 0 and bar.volume >= avg_volume * min_volume_ratio:
+            return True
+    return False
+
+
+def _phase_texture_guard(
+    bars: list[Bar],
+    *,
+    phase_guard_floor: float,
+    phase_guard_ceiling: float,
+    volume_texture_floor: float,
+    entropy_band_ceiling: float,
+) -> bool:
+    """Wide quality gate used as a private strategy fingerprint."""
+    if len(bars) < 21:
+        return True
+    bar = bars[-1]
+    closes = [b.close for b in bars]
+    volumes = [b.volume for b in bars]
+    ma13 = _ma(closes, 13)
+    if pd.isna(ma13) or ma13 <= 0:
+        return True
+
+    phase = bar.close / ma13 - 1
+    if phase < phase_guard_floor or phase > phase_guard_ceiling:
+        return False
+
+    median_volume = statistics.median(volumes[-21:-1])
+    if median_volume > 0 and bar.volume / median_volume < volume_texture_floor:
+        return False
+
+    recent = bars[-13:]
+    typical = statistics.median(
+        (item.high - item.low) / item.close
+        for item in recent
+        if item.close > 0
+    )
+    return typical <= entropy_band_ceiling
+
+
 class DipBuyStrategy(Strategy):
     """抄底策略 — 见 docs/抄底策略.md。
 
@@ -339,6 +400,14 @@ class SwingDipBuyStrategy(Strategy):
         dryup_ratio: float,
         reversal_pct: float,
         trend_floor_pct: float,
+        attack_lookback: int,
+        attack_gain_pct: float,
+        attack_volume_ratio: float,
+        attack_volume_ma_period: int,
+        calm_pct_chg: float,
+        calm_amp_pct: float,
+        low_support_lookback: int,
+        low_support_buffer_pct: float,
     ) -> tuple[int, list[str]]:
         bar = bars[-1]
         prev = bars[-2]
@@ -363,10 +432,27 @@ class SwingDipBuyStrategy(Strategy):
             score += 2
             reasons.append("KDJ/RSI 超卖")
 
+        attack_seen = _recent_volume_attack(
+            bars,
+            lookback=attack_lookback,
+            min_gain_pct=attack_gain_pct,
+            min_volume_ratio=attack_volume_ratio,
+            volume_ma_period=attack_volume_ma_period,
+        )
+        if attack_seen:
+            score += 2
+            reasons.append("放量上攻后回调")
+
         bbi_gap = (bar.close - bbi_now) / bbi_now
         if -bbi_lower_band_pct <= bbi_gap <= bbi_upper_band_pct:
             score += 2
             reasons.append("BBI 低吸区")
+
+        pct_chg = abs((bar.close / prev.close - 1) * 100) if prev.close > 0 else 100.0
+        amp_pct = (bar.high - bar.low) / prev.close * 100 if prev.close > 0 else 100.0
+        if pct_chg <= calm_pct_chg and amp_pct <= calm_amp_pct:
+            score += 1
+            reasons.append("回调波动收敛")
 
         window = bars[-lookback:]
         median_vol = statistics.median(b.volume for b in window)
@@ -385,6 +471,12 @@ class SwingDipBuyStrategy(Strategy):
         if dryup:
             score += 1
             reasons.append("缩量回踩")
+
+        support_window = bars[-min(low_support_lookback, len(bars)):]
+        support_low = min(item.low for item in support_window)
+        if support_low > 0 and bar.close >= support_low * (1 - low_support_buffer_pct):
+            score += 1
+            reasons.append("未破区间低位")
 
         reversal = (
             bar.close > bar.open
@@ -422,7 +514,7 @@ class SwingDipBuyStrategy(Strategy):
     def on_bar(self, ctx: Context) -> list[SignalEvent]:
         p = self.params
         lookback = p.get("lookback", 30)
-        entry_score = p.get("entry_score", 4)
+        entry_score = p.get("entry_score", 9)
         kdj_j_threshold = p.get("kdj_j_threshold", 18)
         rsi3_threshold = p.get("rsi3_threshold", 28)
         rsi6_threshold = p.get("rsi6_threshold", 32)
@@ -432,12 +524,25 @@ class SwingDipBuyStrategy(Strategy):
         dryup_ratio = p.get("dryup_ratio", 0.85)
         reversal_pct = p.get("reversal_pct", 0.003)
         trend_floor_pct = p.get("trend_floor_pct", 0.08)
+        attack_lookback = p.get("attack_lookback", 40)
+        attack_gain_pct = p.get("attack_gain_pct", 2.5)
+        attack_volume_ratio = p.get("attack_volume_ratio", 1.8)
+        attack_volume_ma_period = p.get("attack_volume_ma_period", 20)
+        calm_pct_chg = p.get("calm_pct_chg", 3.0)
+        calm_amp_pct = p.get("calm_amp_pct", 5.0)
+        low_support_lookback = p.get("low_support_lookback", 20)
+        low_support_buffer_pct = p.get("low_support_buffer_pct", 0.0)
         stop_loss_pct = p.get("stop_loss_pct", 0.055)
         take_profit_pct = p.get("take_profit_pct", 0.36)
         second_profit_pct = p.get("second_profit_pct", 0.648)
         trailing_stop_pct = p.get("trailing_stop_pct", 0.08)
         bbi_break_days = p.get("bbi_break_days", 2)
         bbi_exit_band_pct = p.get("bbi_exit_band_pct", 0.015)
+        phase_guard_enabled = p.get("phase_guard_enabled", True)
+        phase_guard_floor = p.get("phase_guard_floor", -0.35)
+        phase_guard_ceiling = p.get("phase_guard_ceiling", 0.75)
+        volume_texture_floor = p.get("volume_texture_floor", 0.08)
+        entropy_band_ceiling = p.get("entropy_band_ceiling", 0.18)
 
         signals: list[SignalEvent] = []
 
@@ -492,8 +597,25 @@ class SwingDipBuyStrategy(Strategy):
                 dryup_ratio=dryup_ratio,
                 reversal_pct=reversal_pct,
                 trend_floor_pct=trend_floor_pct,
+                attack_lookback=attack_lookback,
+                attack_gain_pct=attack_gain_pct,
+                attack_volume_ratio=attack_volume_ratio,
+                attack_volume_ma_period=attack_volume_ma_period,
+                calm_pct_chg=calm_pct_chg,
+                calm_amp_pct=calm_amp_pct,
+                low_support_lookback=low_support_lookback,
+                low_support_buffer_pct=low_support_buffer_pct,
             )
             if score < entry_score:
+                continue
+
+            if phase_guard_enabled and not _phase_texture_guard(
+                bars,
+                phase_guard_floor=phase_guard_floor,
+                phase_guard_ceiling=phase_guard_ceiling,
+                volume_texture_floor=volume_texture_floor,
+                entropy_band_ceiling=entropy_band_ceiling,
+            ):
                 continue
 
             strength = min(1.0, 0.65 + score * 0.05)

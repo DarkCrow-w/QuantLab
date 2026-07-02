@@ -11,6 +11,7 @@ from server.routers import (
     screening,
     strategy,
     strategy_assets,
+    strategy_samples,
     system,
     trading,
 )
@@ -41,6 +42,7 @@ app.add_middleware(
 app.include_router(backtest.router)
 app.include_router(strategy.router)
 app.include_router(strategy_assets.router)
+app.include_router(strategy_samples.router)
 app.include_router(market.router)
 app.include_router(screening.router)
 app.include_router(factors.router)

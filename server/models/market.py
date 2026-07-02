@@ -6,9 +6,9 @@ from pydantic import BaseModel, Field
 class ParamSchema(BaseModel):
     name: str
     type: str
-    default: int | float
-    min: int | float
-    max: int | float
+    default: int | float | str
+    min: int | float | None = None
+    max: int | float | None = None
     label: str
 
 
@@ -22,7 +22,7 @@ class StrategyAssetDraft(BaseModel):
     name: str
     description: str = ""
     base_strategy: str
-    params: dict[str, int | float] = Field(default_factory=dict)
+    params: dict[str, int | float | str] = Field(default_factory=dict)
     tags: list[str] = Field(default_factory=list)
     enabled: bool = True
 
